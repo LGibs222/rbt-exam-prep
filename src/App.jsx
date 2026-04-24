@@ -670,7 +670,7 @@ function ModulesScreen({ weakDomains, moduleStatus, onSelectModule, onStartExam 
 }
 
 // ─── ModuleScreen (content + quiz) ───────────────────────────────────────────
-function ModuleScreen({ domainName, modulePhase, quizAnswers, quizSubmitted, onAnswer, onSubmitQuiz, onRetryQuiz, onBackToModules, onStartQuiz }) {
+function ModuleScreen({ domainName, modulePhase, quizAnswers, quizSubmitted, onAnswer, onSubmitQuiz, onRetryQuiz, onBackToModules, onStartQuiz, onReviewConcepts }) {
   const mod = MODULES[domainName]
   const [conceptIdx, setConceptIdx] = useState(0)
   const [quizIdx, setQuizIdx] = useState(0)
@@ -793,6 +793,12 @@ function ModuleScreen({ domainName, modulePhase, quizAnswers, quizSubmitted, onA
           <p style={{ color: '#64748b', fontSize: '.88rem', marginTop: '.3rem' }}>Need ≥ 4/5 (80%) to pass</p>
         </div>
 
+        {!passed && (
+          <div style={{ fontSize: 11, fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span>🔍</span> Review your {totalQ - correct} missed question{(totalQ - correct) > 1 ? 's' : ''} before retrying
+          </div>
+        )}
+
         {mod.practice.map((q, i) => {
           const chosen = quizAnswers[i]
           const isCorrect = chosen === q.correct
@@ -812,13 +818,18 @@ function ModuleScreen({ domainName, modulePhase, quizAnswers, quizSubmitted, onA
           )
         })}
 
-        <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem', flexWrap: 'wrap' }}>
-          <button className="btn btn-ghost" onClick={onBackToModules}>← Back to Study Plan</button>
+        <div style={{ display: 'flex', gap: '.75rem', marginTop: '1rem', flexWrap: 'wrap' }}>
+          {!passed && (
+            <button className="btn btn-secondary" onClick={onReviewConcepts} style={{ borderColor: color, color }}>
+              📖 Re-read Concepts
+            </button>
+          )}
           {!passed && (
             <button className="btn btn-primary" onClick={onRetryQuiz} style={{ background: color, borderColor: color }}>
               ↺ Retry Quiz
             </button>
           )}
+          <button className="btn btn-ghost" onClick={onBackToModules}>← Back to Study Plan</button>
         </div>
       </div>
     )
@@ -1496,6 +1507,7 @@ export default function App() {
           onAnswer={handleModuleAnswer}
           onSubmitQuiz={handleModuleSubmitQuiz}
           onRetryQuiz={handleModuleRetryQuiz}
+          onReviewConcepts={() => setState(s => ({ ...s, modulePhase: 'content', moduleQuizAnswers: {}, moduleQuizSubmitted: false }))}
           onBackToModules={handleBackToModules}
           onStartQuiz={handleModuleStartQuiz}
         />
