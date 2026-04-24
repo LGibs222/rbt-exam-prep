@@ -25,6 +25,13 @@ const DOMAIN_COLORS = {
   'Ethics': '#0f766e',
 }
 
+const CONCEPT_TYPES = [
+  { label: 'Core Concept',          icon: '📖', color: '#1a3a5c', bg: '#e8f0fb', border: '#93c5fd' },
+  { label: 'Key Principles',        icon: '⚙️',  color: '#166534', bg: '#f0fdf4', border: '#86efac' },
+  { label: 'Critical Distinction',  icon: '⚠️',  color: '#92400e', bg: '#fffbeb', border: '#fcd34d' },
+  { label: 'Exam Strategy',         icon: '💡', color: '#5b21b6', bg: '#f5f3ff', border: '#c4b5fd' },
+]
+
 const DOMAIN_ICONS = {
   'Data Collection and Graphing': '📊',
   'Behavior Assessment': '🔍',
@@ -48,6 +55,16 @@ function shuffle(arr) {
   return a
 }
 
+function shuffleQuestion(q) {
+  const idx = [0,1,2,3]
+  for (let i = 3; i > 0; i--) { const j = Math.floor(Math.random()*(i+1));[idx[i],idx[j]]=[idx[j],idx[i]] }
+  return {...q, options: idx.map(i => q.options[i]), correct: idx.indexOf(q.correct)}
+}
+
+function shuffleQuestions(qs) {
+  return [...qs].sort(() => Math.random() - 0.5).map(shuffleQuestion)
+}
+
 function buildExam() {
   const result = []
   for (const [letter, count] of Object.entries(EXAM_DOMAIN_COUNTS)) {
@@ -55,7 +72,7 @@ function buildExam() {
     const picked = shuffle(pool).slice(0, count)
     result.push(...picked)
   }
-  return shuffle(result)
+  return shuffle(result).map(shuffleQuestion)
 }
 
 function scoreDomains(questions, answers) {
@@ -85,6 +102,7 @@ function fmtTime(sec) {
 const INITIAL = {
   phase: 'welcome',
   // pretest
+  pretestQuestions: [],
   pretestAnswers: {},  // index → choice
   pretestSubmitted: false,
   pretestDomainScores: null, // array of {name, total, correct, pct}
@@ -246,10 +264,10 @@ function WelcomeScreen({ onBegin }) {
 }
 
 // ─── PretestScreen ────────────────────────────────────────────────────────────
-function PretestScreen({ answers, onAnswer, onSubmit, onBack }) {
+function PretestScreen({ questions, answers, onAnswer, onSubmit, onBack }) {
   const [currentIdx, setCurrentIdx] = useState(0)
-  const q = PRETEST_QUESTIONS[currentIdx]
-  const total = PRETEST_QUESTIONS.length
+  const q = questions[currentIdx]
+  const total = questions.length
   const answered = Object.keys(answers).length
   const allAnswered = answered === total
 
@@ -308,7 +326,7 @@ function PretestScreen({ answers, onAnswer, onSubmit, onBack }) {
 
       {/* Question dot navigator */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.35rem', marginBottom: '1.25rem' }}>
-        {PRETEST_QUESTIONS.map((_, i) => (
+        {questions.map((_, i) => (
           <button
             key={i}
             onClick={() => setCurrentIdx(i)}
@@ -493,6 +511,7 @@ function ModuleScreen({ domainName, modulePhase, quizAnswers, quizSubmitted, onA
 
   if (modulePhase === 'content') {
     const concept = mod.concepts[conceptIdx]
+    const ctype = CONCEPT_TYPES[conceptIdx % CONCEPT_TYPES.length]
     return (
       <div className="page">
         <div style={{ display: 'flex', alignItems: 'center', gap: '.75rem', marginBottom: '1.25rem' }}>
@@ -506,22 +525,28 @@ function ModuleScreen({ domainName, modulePhase, quizAnswers, quizSubmitted, onA
           <div className="progress-fill" style={{ width: `${((conceptIdx + 1) / mod.concepts.length) * 100}%`, background: color }} />
         </div>
 
-        <div className="card" style={{ padding: '1.75rem', marginBottom: '1.25rem', borderTop: `4px solid ${color}` }}>
-          <div style={{ display: 'flex', gap: '.5rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
-            {mod.concepts.map((c, i) => (
-              <button key={i} onClick={() => setConceptIdx(i)} style={{
-                padding: '.3rem .75rem', borderRadius: 99,
-                background: i === conceptIdx ? color : '#f1f5f9',
-                color: i === conceptIdx ? '#fff' : '#64748b',
-                border: 'none', fontSize: '.8rem', fontWeight: 600, cursor: 'pointer',
-              }}>
-                {i + 1}. {c.title.length > 20 ? c.title.slice(0, 18) + '…' : c.title}
-              </button>
-            ))}
+        <div style={{ marginBottom: '1.25rem', borderRadius: 12, overflow: 'hidden', border: `1px solid ${ctype.border}`, boxShadow: '0 2px 10px rgba(0,0,0,0.07)' }}>
+          <div style={{ background: ctype.bg, padding: '9px 16px', borderBottom: `1px solid ${ctype.border}`, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 14 }}>{ctype.icon}</span>
+            <span style={{ fontSize: 11, fontWeight: 800, color: ctype.color, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{ctype.label}</span>
           </div>
+          <div style={{ background: '#fff', padding: '1.5rem' }}>
+            <div style={{ display: 'flex', gap: '.5rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+              {mod.concepts.map((c, i) => (
+                <button key={i} onClick={() => setConceptIdx(i)} style={{
+                  padding: '.3rem .75rem', borderRadius: 99,
+                  background: i === conceptIdx ? color : '#f1f5f9',
+                  color: i === conceptIdx ? '#fff' : '#64748b',
+                  border: 'none', fontSize: '.8rem', fontWeight: 600, cursor: 'pointer',
+                }}>
+                  {i + 1}. {c.title.length > 20 ? c.title.slice(0, 18) + '…' : c.title}
+                </button>
+              ))}
+            </div>
 
-          <h3 style={{ fontWeight: 800, fontSize: '1.1rem', color, marginBottom: '.75rem' }}>{concept.title}</h3>
-          <p style={{ lineHeight: 1.75, color: '#374151', fontSize: '.95rem', whiteSpace: 'pre-wrap' }}>{concept.body}</p>
+            <h3 style={{ fontWeight: 800, fontSize: '1.1rem', color: ctype.color, marginBottom: '.75rem' }}>{concept.title}</h3>
+            <p style={{ lineHeight: 1.75, color: '#374151', fontSize: '.95rem', whiteSpace: 'pre-wrap' }}>{concept.body}</p>
+          </div>
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -934,7 +959,7 @@ export default function App() {
 
   const handlePretestSubmit = useCallback(() => {
     setState(s => {
-      const scores = scoreDomains(PRETEST_QUESTIONS, s.pretestAnswers)
+      const scores = scoreDomains(s.pretestQuestions, s.pretestAnswers)
       const weak = scores.filter(d => d.pct !== null && d.pct < 70).map(d => d.name)
       const modStatus = {}
       weak.forEach(d => { modStatus[d] = 'available' })
@@ -1067,11 +1092,12 @@ export default function App() {
       />
 
       {phase === 'welcome' && (
-        <WelcomeScreen onBegin={() => setState(s => ({ ...s, phase: 'pretest' }))} />
+        <WelcomeScreen onBegin={() => setState(s => ({ ...s, phase: 'pretest', pretestQuestions: shuffleQuestions(PRETEST_QUESTIONS) }))} />
       )}
 
       {phase === 'pretest' && (
         <PretestScreen
+          questions={state.pretestQuestions.length ? state.pretestQuestions : PRETEST_QUESTIONS}
           answers={state.pretestAnswers}
           onAnswer={handlePretestAnswer}
           onSubmit={handlePretestSubmit}
