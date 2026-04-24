@@ -4,6 +4,17 @@ import { MODULES } from './data/modules.js'
 import { QUESTION_BANK } from './data/questions.js'
 import { MODULE_ENHANCEMENTS } from './data/moduleEnhancements.js'
 
+// ─── localStorage persistence ─────────────────────────────────────────────────
+const STORAGE_KEY = 'rbt-exam-prep-v1'
+const loadPersisted = () => {
+  try {
+    const r = localStorage.getItem(STORAGE_KEY)
+    return r ? JSON.parse(r) : null
+  } catch { return null }
+}
+const savePersisted = d => { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(d)) } catch {} }
+const clearPersisted = () => { try { localStorage.removeItem(STORAGE_KEY) } catch {} }
+
 // ─── constants ────────────────────────────────────────────────────────────────
 const DOMAIN_NAMES = [
   'Data Collection and Graphing',
@@ -1117,7 +1128,14 @@ function FinalResultsScreen({ examQuestions, examAnswers, examDomainScores, pret
 
 // ─── App ──────────────────────────────────────────────────────────────────────
 export default function App() {
-  const [state, setState] = useState(INITIAL)
+  const [state, setState] = useState(() => {
+    const p = loadPersisted()
+    return p ? { ...INITIAL, ...p } : INITIAL
+  })
+
+  useEffect(() => {
+    savePersisted(state)
+  }, [state])
   const timerRef = useRef(null)
 
   // Timer for exam
@@ -1144,6 +1162,7 @@ export default function App() {
 
   const reset = useCallback(() => {
     clearInterval(timerRef.current)
+    clearPersisted()
     setState(INITIAL)
   }, [])
 
