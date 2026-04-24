@@ -1049,8 +1049,146 @@ function ExamScreen({ questions, answers, flagged, timeLeft, onAnswer, onFlag, o
   )
 }
 
+// ─── ExamReviewScreen ─────────────────────────────────────────────────────────
+function ExamReviewScreen({ examQuestions, examAnswers, onBack }) {
+  const [filter, setFilter] = useState('all')
+  const [domainFilter, setDomainFilter] = useState('')
+  const [idx, setIdx] = useState(0)
+  const [showNav, setShowNav] = useState(false)
+
+  const allDomains = [...new Set(examQuestions.map(q => q.domain_name))].sort()
+  const missedCount = examQuestions.filter((q, i) => examAnswers[i] !== q.correct).length
+  const correctCount = examQuestions.length - missedCount
+
+  const filtered = examQuestions
+    .map((q, i) => ({ ...q, _origIdx: i, _userAns: examAnswers[i], _isCorrect: examAnswers[i] === q.correct }))
+    .filter(q => {
+      if (filter === 'missed' && q._isCorrect) return false
+      if (filter === 'correct' && !q._isCorrect) return false
+      if (domainFilter && q.domain_name !== domainFilter) return false
+      return true
+    })
+
+  useEffect(() => { setIdx(0) }, [filter, domainFilter])
+
+  const q = filtered[Math.min(idx, Math.max(0, filtered.length - 1))]
+  const filterBtn = (val, label, count, color) => (
+    <button onClick={() => setFilter(val)}
+      style={{
+        padding: '6px 12px', borderRadius: 99,
+        border: `1.5px solid ${filter === val ? color : '#e2e8f0'}`,
+        background: filter === val ? color : '#fff',
+        color: filter === val ? '#fff' : color,
+        cursor: 'pointer', fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap', fontFamily: 'inherit',
+      }}>
+      {label} ({count})
+    </button>
+  )
+
+  return (
+    <div className="page">
+      <button className="btn btn-ghost btn-sm" onClick={onBack} style={{ marginBottom: '.75rem' }}>← Back to Results</button>
+      <h2 style={{ fontSize: '1.4rem', fontWeight: 800, marginBottom: '.75rem' }}>📖 Exam Review</h2>
+
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+        {filterBtn('all', 'All', examQuestions.length, '#1d4ed8')}
+        {filterBtn('missed', 'Missed', missedCount, '#dc2626')}
+        {filterBtn('correct', 'Correct', correctCount, '#16a34a')}
+      </div>
+
+      <div style={{ marginBottom: '1rem' }}>
+        <select value={domainFilter} onChange={e => setDomainFilter(e.target.value)}
+          style={{ padding: '7px 12px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13, background: '#fff', color: '#1e293b', fontFamily: 'inherit', width: '100%', maxWidth: 360 }}>
+          <option value="">All domains</option>
+          {allDomains.map(d => <option key={d} value={d}>{DOMAIN_ICONS[d] || ''} {d}</option>)}
+        </select>
+      </div>
+
+      {filtered.length === 0 ? (
+        <div className="card" style={{ padding: '2rem', textAlign: 'center' }}>
+          <p style={{ color: '#64748b', margin: 0 }}>No questions match the current filters.</p>
+        </div>
+      ) : (
+        <>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, flexWrap: 'wrap', gap: 8 }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: DOMAIN_COLORS[q.domain_name] || '#1d4ed8', background: `${DOMAIN_COLORS[q.domain_name] || '#1d4ed8'}18`, padding: '3px 10px', borderRadius: 99 }}>
+              {DOMAIN_ICONS[q.domain_name]} {q.domain_name}
+            </span>
+            <span style={{ fontSize: 12, color: '#94a3b8' }}>Question {idx + 1} of {filtered.length} · original #{q._origIdx + 1}</span>
+          </div>
+
+          <div style={{
+            padding: '8px 14px', borderRadius: 10, marginBottom: 14, fontSize: 13, fontWeight: 700,
+            background: q._userAns === undefined ? '#f1f5f9' : q._isCorrect ? '#dcfce7' : '#fee2e2',
+            color: q._userAns === undefined ? '#64748b' : q._isCorrect ? '#16a34a' : '#dc2626',
+            border: `1px solid ${q._userAns === undefined ? '#e2e8f0' : q._isCorrect ? '#86efac' : '#fca5a5'}`,
+          }}>
+            {q._userAns === undefined ? '— Unanswered' : q._isCorrect ? '✓ Correct' : '✗ Incorrect'}
+          </div>
+
+          <div className="card" style={{ padding: '1.25rem', marginBottom: '1rem' }}>
+            <p style={{ fontSize: '.98rem', lineHeight: 1.7, margin: 0, fontWeight: 500 }}>{q.stem}</p>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: '1rem' }}>
+            {q.options.map((opt, i) => {
+              const isUser = i === q._userAns
+              const isCorrect = i === q.correct
+              let bg = '#fff', border = '#e2e8f0', labelColor = '#64748b'
+              if (isCorrect) { bg = '#dcfce7'; border = '#86efac'; labelColor = '#16a34a' }
+              if (isUser && !isCorrect) { bg = '#fee2e2'; border = '#fca5a5'; labelColor = '#dc2626' }
+              return (
+                <div key={i} style={{
+                  padding: '11px 14px', borderRadius: 10, border: `2px solid ${border}`, background: bg,
+                  fontSize: 14, color: '#1e293b', display: 'flex', alignItems: 'flex-start', gap: 10,
+                }}>
+                  <span style={{ fontWeight: 700, flexShrink: 0, color: labelColor, minWidth: 16 }}>{String.fromCharCode(65 + i)}.</span>
+                  <span style={{ flex: 1, lineHeight: 1.55 }}>{opt}</span>
+                  <span style={{ fontSize: 11, fontWeight: 700, flexShrink: 0, color: labelColor, whiteSpace: 'nowrap' }}>
+                    {isUser && isCorrect ? '✓ Your answer' : isCorrect ? '✓ Correct' : isUser ? '✗ Your answer' : ''}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+
+          <div className="card" style={{ padding: '1.1rem 1.25rem', marginBottom: '1rem', background: '#f8fafc' }}>
+            <div style={{ fontSize: 10, fontWeight: 800, color: '#1d4ed8', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 6 }}>📘 Rationale</div>
+            <p style={{ fontSize: '.88rem', lineHeight: 1.7, margin: 0 }}>{q.rationale}</p>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginBottom: '.75rem' }}>
+            <button className="btn btn-ghost btn-sm" onClick={() => setIdx(i => Math.max(0, i - 1))} disabled={idx === 0}>← Previous</button>
+            <button className="btn btn-ghost btn-sm" onClick={() => setShowNav(v => !v)}>📋 Navigator</button>
+            <button className="btn btn-primary btn-sm" onClick={() => setIdx(i => Math.min(filtered.length - 1, i + 1))} disabled={idx === filtered.length - 1}>Next →</button>
+          </div>
+
+          {showNav && (
+            <div className="card" style={{ padding: '1rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(32px,1fr))', gap: 4 }}>
+                {filtered.map((fq, i) => (
+                  <button key={i} onClick={() => { setIdx(i); setShowNav(false) }}
+                    style={{
+                      aspectRatio: '1', borderRadius: 6,
+                      border: i === idx ? '2px solid #1d4ed8' : 'none',
+                      background: fq._isCorrect ? '#dcfce7' : fq._userAns === undefined ? '#f1f5f9' : '#fee2e2',
+                      color: fq._isCorrect ? '#16a34a' : fq._userAns === undefined ? '#94a3b8' : '#dc2626',
+                      fontSize: 10, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+                    }}>
+                    {fq._origIdx + 1}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+
 // ─── FinalResultsScreen ───────────────────────────────────────────────────────
-function FinalResultsScreen({ examQuestions, examAnswers, examDomainScores, pretestDomainScores, onRetakeExam, onReset }) {
+function FinalResultsScreen({ examQuestions, examAnswers, examDomainScores, pretestDomainScores, onRetakeExam, onReset, onReview }) {
   const total = examQuestions.length
   const correct = examQuestions.filter((q, i) => examAnswers[i] === q.correct).length
   const pct = Math.round((correct / total) * 100)
@@ -1118,9 +1256,10 @@ function FinalResultsScreen({ examQuestions, examAnswers, examDomainScores, pret
         </div>
       </div>
 
-      <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-        <button className="btn btn-secondary" style={{ flex: 1 }} onClick={onRetakeExam}>↺ Retake Exam</button>
-        <button className="btn btn-ghost" style={{ flex: 1 }} onClick={onReset}>🏠 Start Over</button>
+      <div style={{ display: 'flex', gap: '.75rem', flexWrap: 'wrap' }}>
+        <button className="btn btn-primary" style={{ flex: '2 1 220px' }} onClick={onReview}>📖 Review All Questions →</button>
+        <button className="btn btn-secondary" style={{ flex: '1 1 140px' }} onClick={onRetakeExam}>↺ Retake Exam</button>
+        <button className="btn btn-ghost" style={{ flex: '1 1 140px' }} onClick={onReset}>🏠 Start Over</button>
       </div>
     </div>
   )
@@ -1378,6 +1517,14 @@ export default function App() {
         />
       )}
 
+      {phase === 'exam_review' && state.examQuestions && (
+        <ExamReviewScreen
+          examQuestions={state.examQuestions}
+          examAnswers={state.examAnswers}
+          onBack={() => setState(s => ({ ...s, phase: 'final_results' }))}
+        />
+      )}
+
       {phase === 'final_results' && state.examDomainScores && (
         <FinalResultsScreen
           examQuestions={state.examQuestions}
@@ -1386,6 +1533,7 @@ export default function App() {
           pretestDomainScores={state.pretestDomainScores}
           onRetakeExam={handleRetakeExam}
           onReset={reset}
+          onReview={() => setState(s => ({ ...s, phase: 'exam_review' }))}
         />
       )}
     </>
