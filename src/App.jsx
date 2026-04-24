@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { PRETEST_QUESTIONS } from './data/pretest.js'
 import { MODULES } from './data/modules.js'
 import { QUESTION_BANK } from './data/questions.js'
+import { MODULE_ENHANCEMENTS } from './data/moduleEnhancements.js'
 
 // ─── constants ────────────────────────────────────────────────────────────────
 const DOMAIN_NAMES = [
@@ -31,6 +32,154 @@ const CONCEPT_TYPES = [
   { label: 'Critical Distinction',  icon: '⚠️',  color: '#92400e', bg: '#fffbeb', border: '#fcd34d' },
   { label: 'Exam Strategy',         icon: '💡', color: '#5b21b6', bg: '#f5f3ff', border: '#c4b5fd' },
 ]
+
+// ─── global styles + interactive primitives ───────────────────────────────────
+const GlobalStyles = () => (
+  <style>{`
+    @keyframes conceptIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+    .concept-in{animation:conceptIn .32s ease forwards}
+    .kt-card:hover{filter:brightness(.96)}
+  `}</style>
+)
+
+function KeyTermCard({term,def,color,bg,border}) {
+  const [flipped,setFlipped] = useState(false)
+  return (
+    <div className="kt-card" onClick={()=>setFlipped(f=>!f)}
+      style={{cursor:'pointer',minHeight:72,perspective:800,userSelect:'none'}}>
+      <div style={{position:'relative',width:'100%',minHeight:72,transformStyle:'preserve-3d',
+        transition:'transform .45s cubic-bezier(.4,0,.2,1)',
+        transform:flipped?'rotateY(180deg)':'rotateY(0deg)'}}>
+        <div style={{position:'absolute',inset:0,backfaceVisibility:'hidden',WebkitBackfaceVisibility:'hidden',
+          background:bg,border:`1.5px solid ${border}`,borderRadius:10,
+          display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'8px 12px',minHeight:72}}>
+          <span style={{fontSize:10,color,fontWeight:700,textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:4,opacity:.7}}>tap to define</span>
+          <span style={{fontSize:13,fontWeight:800,color,textAlign:'center',lineHeight:1.3}}>{term}</span>
+        </div>
+        <div style={{position:'absolute',inset:0,backfaceVisibility:'hidden',WebkitBackfaceVisibility:'hidden',
+          transform:'rotateY(180deg)',background:'#fff',border:`1.5px solid ${border}`,borderRadius:10,
+          display:'flex',alignItems:'center',justifyContent:'center',padding:'8px 12px',minHeight:72}}>
+          <span style={{fontSize:12,color:'#1e293b',textAlign:'center',lineHeight:1.5}}>{def}</span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── SVG visual components ────────────────────────────────────────────────────
+function FAChart() {
+  const bars=[{l:'Alone',v:9,c:'#dc2626'},{l:'Attention',v:1,c:'#93c5fd'},{l:'Demand',v:1,c:'#93c5fd'},{l:'Play',v:1,c:'#93c5fd'}]
+  const W=280,H=100,pL=28,bW=42,gap=14
+  return (
+    <svg viewBox={`0 0 ${W} ${H+50}`} style={{width:'100%',maxWidth:280,display:'block',margin:'0 auto'}}>
+      <text x={W/2} y={13} textAnchor="middle" fontSize={10} fontWeight="700" fill="#64748b">FA Pattern — Automatic Reinforcement</text>
+      <line x1={pL-2} y1={18} x2={pL-2} y2={H+18} stroke="#e2e8f0" strokeWidth={1}/>
+      <text x={pL-4} y={22} textAnchor="end" fontSize={8} fill="#94a3b8">High</text>
+      <text x={pL-4} y={H+18} textAnchor="end" fontSize={8} fill="#94a3b8">Low</text>
+      {bars.map((b,i)=>{const x=pL+(bW+gap)*i,bh=(b.v/10)*H;return(
+        <g key={i}><rect x={x} y={H-bh+18} width={bW} height={bh} fill={b.c} rx={4} opacity={.9}/>
+          <text x={x+bW/2} y={H+32} textAnchor="middle" fontSize={9} fill="#64748b">{b.l}</text></g>
+      )})}
+      <text x={W/2} y={H+48} textAnchor="middle" fontSize={9} fill="#dc2626" fontStyle="italic">↑ Alone = high rate → automatic (sensory) reinforcement</text>
+    </svg>
+  )
+}
+
+function ExtinctionGraph() {
+  const pts=[5,5,5,5,9,8,7,5,4,3,2,1,1,3,1,1]
+  const W=290,H=88,pL=24
+  const pp=pts.map((v,i)=>[pL+(i/(pts.length-1))*(W-pL-6),H-(v/10)*H+16])
+  const burstX=pL+(4/(pts.length-1))*(W-pL-6)
+  const recX=pL+(11/(pts.length-1))*(W-pL-6)
+  return (
+    <svg viewBox={`0 0 ${W} ${H+50}`} style={{width:'100%',maxWidth:290,display:'block',margin:'0 auto'}}>
+      <text x={W/2} y={13} textAnchor="middle" fontSize={10} fontWeight="700" fill="#64748b">Extinction Pattern</text>
+      <line x1={pL-2} y1={16} x2={pL-2} y2={H+16} stroke="#e2e8f0" strokeWidth={1}/>
+      <line x1={burstX} y1={16} x2={burstX} y2={H+16} stroke="#f59e0b" strokeDasharray="4,3" strokeWidth={1.5}/>
+      <text x={burstX+2} y={26} fontSize={8} fill="#92400e">Extinction begins</text>
+      <line x1={recX} y1={16} x2={recX} y2={H+16} stroke="#94a3b8" strokeDasharray="3,2" strokeWidth={1}/>
+      <polyline points={pp.map(p=>p.join(',')).join(' ')} fill="none" stroke="#dc2626" strokeWidth={2}/>
+      {pp.map(([x,y],i)=><circle key={i} cx={x} cy={y} r={2.5} fill="#dc2626"/>)}
+      <text x={pL-4} y={20} textAnchor="end" fontSize={8} fill="#94a3b8">Hi</text>
+      <text x={pL-4} y={H+16} textAnchor="end" fontSize={8} fill="#94a3b8">Lo</text>
+      <text x={(burstX+recX)/2} y={H+28} textAnchor="middle" fontSize={8.5} fill="#dc2626">Burst ↑</text>
+      <text x={(recX+W-6)/2} y={H+28} textAnchor="middle" fontSize={8} fill="#64748b">Spont. Recovery</text>
+      <text x={W/2} y={H+44} textAnchor="middle" fontSize={8.5} fill="#475569" fontStyle="italic">Extinction burst = temporary — not treatment failure</text>
+    </svg>
+  )
+}
+
+function PromptHierarchyChart() {
+  const levels=[
+    {l:'Full Physical Prompt',c:'#dc2626',w:230},{l:'Partial Physical Prompt',c:'#ea580c',w:200},
+    {l:'Model Prompt',c:'#d97706',w:170},{l:'Gestural Prompt',c:'#65a30d',w:140},
+    {l:'Vocal / Textual Prompt',c:'#0ea5e9',w:110},{l:'Independent (Goal)',c:'#6366f1',w:80},
+  ]
+  const W=290,rH=26,top=18
+  return (
+    <svg viewBox={`0 0 ${W} ${levels.length*rH+top+24}`} style={{width:'100%',maxWidth:290,display:'block',margin:'0 auto'}}>
+      <text x={W/2} y={13} textAnchor="middle" fontSize={10} fontWeight="700" fill="#64748b">Prompting Hierarchy (Most → Least Restrictive)</text>
+      {levels.map((l,i)=>{const y=top+i*rH,x=(W-l.w)/2;return(
+        <g key={i}><rect x={x} y={y} width={l.w} height={rH-3} fill={l.c} rx={4} opacity={.88}/>
+          <text x={W/2} y={y+rH-9} textAnchor="middle" fontSize={9} fontWeight="700" fill="#fff">{l.l}</text></g>
+      )})}
+      <text x={W/2} y={levels.length*rH+top+18} textAnchor="middle" fontSize={9} fill="#64748b">Use the least restrictive prompt that produces the correct response</text>
+    </svg>
+  )
+}
+
+function MeasurementTypesChart() {
+  const types=[
+    {n:'Duration',desc:'How long behavior lasts each occurrence',c:'#2563eb'},
+    {n:'Frequency',desc:'Count of how many times behavior occurs',c:'#7c3aed'},
+    {n:'Rate',desc:'Frequency divided by observation time',c:'#0891b2'},
+    {n:'Latency',desc:'Time from SD presentation to behavior onset',c:'#16a34a'},
+    {n:'IRT',desc:'Time elapsed between successive responses',c:'#dc2626'},
+  ]
+  const W=290,rH=34,pL=8,top=18
+  return (
+    <svg viewBox={`0 0 ${W} ${types.length*rH+top+14}`} style={{width:'100%',maxWidth:290,display:'block',margin:'0 auto'}}>
+      <text x={W/2} y={13} textAnchor="middle" fontSize={10} fontWeight="700" fill="#64748b">Continuous Measurement Types</text>
+      {types.map((t,i)=>{const y=top+i*rH;return(
+        <g key={i}>
+          <rect x={pL} y={y} width={W-pL*2} height={rH-4} fill={`${t.c}15`} rx={6} stroke={`${t.c}40`} strokeWidth={1}/>
+          <rect x={pL} y={y} width={8} height={rH-4} fill={t.c} rx={3} opacity={.85}/>
+          <text x={pL+14} y={y+rH-12} fontSize={11} fontWeight="800" fill={t.c}>{t.n}</text>
+          <text x={pL+100} y={y+rH-12} fontSize={9} fill="#64748b">{t.desc}</text>
+        </g>
+      )})}
+    </svg>
+  )
+}
+
+function GraphElementsChart() {
+  const W=290,H=90,pL=30,pB=28
+  const data=[6,6,5,6,5,2,2,1,2,1]
+  const pts=data.map((v,i)=>[pL+(i/(data.length-1))*(W-pL-10),H-(v/8)*H+16])
+  const bx=pL+(4/(data.length-1))*(W-pL-10)
+  return (
+    <svg viewBox={`0 0 ${W} ${H+pB+14}`} style={{width:'100%',maxWidth:290,display:'block',margin:'0 auto'}}>
+      <text x={W/2} y={13} textAnchor="middle" fontSize={10} fontWeight="700" fill="#64748b">Graph Elements — What to Look For</text>
+      <line x1={pL-2} y1={16} x2={pL-2} y2={H+16} stroke="#e2e8f0" strokeWidth={1}/>
+      <line x1={pL-2} y1={H+16} x2={W-10} y2={H+16} stroke="#e2e8f0" strokeWidth={1}/>
+      <line x1={bx} y1={16} x2={bx} y2={H+16} stroke="#2c6e49" strokeDasharray="4,3" strokeWidth={1.5}/>
+      <text x={bx+2} y={26} fontSize={8} fill="#166534">B→</text>
+      <polyline points={pts.map(p=>p.join(',')).join(' ')} fill="none" stroke="#1a3a5c" strokeWidth={2}/>
+      {pts.map(([x,y],i)=><circle key={i} cx={x} cy={y} r={3} fill="#1a3a5c"/>)}
+      <text x={pL+30} y={H+26} textAnchor="middle" fontSize={8} fill="#64748b">Level</text>
+      <text x={W/2} y={H+26} textAnchor="middle" fontSize={8} fill="#64748b">Trend ↘</text>
+      <text x={W-30} y={H+26} textAnchor="middle" fontSize={8} fill="#64748b">Variability</text>
+      <text x={pL-4} y={20} textAnchor="end" fontSize={8} fill="#94a3b8">Hi</text>
+      <text x={pL-4} y={H+16} textAnchor="end" fontSize={8} fill="#94a3b8">Lo</text>
+      <text x={W/2} y={H+38} textAnchor="middle" fontSize={8.5} fill="#475569" fontStyle="italic">Stable baseline → clear change → maintained effect</text>
+    </svg>
+  )
+}
+
+function ConceptVisual({type}) {
+  const map={fa_chart:<FAChart/>,extinction_graph:<ExtinctionGraph/>,prompt_hierarchy:<PromptHierarchyChart/>,measurement_types:<MeasurementTypesChart/>,graph_analysis:<GraphElementsChart/>}
+  return map[type]||null
+}
 
 const DOMAIN_ICONS = {
   'Data Collection and Graphing': '📊',
@@ -510,10 +659,12 @@ function ModuleScreen({ domainName, modulePhase, quizAnswers, quizSubmitted, onA
   if (!mod) return <div className="page"><p>Module not found.</p></div>
 
   if (modulePhase === 'content') {
-    const concept = mod.concepts[conceptIdx]
+    const enh = MODULE_ENHANCEMENTS[domainName]?.[conceptIdx] || {}
+    const concept = { ...mod.concepts[conceptIdx], ...enh }
     const ctype = CONCEPT_TYPES[conceptIdx % CONCEPT_TYPES.length]
     return (
       <div className="page">
+        <GlobalStyles/>
         <div style={{ display: 'flex', alignItems: 'center', gap: '.75rem', marginBottom: '1.25rem' }}>
           <button className="btn btn-ghost btn-sm" onClick={onBackToModules}>← Back</button>
           <h2 style={{ fontWeight: 800, color, fontSize: '1.2rem' }}>
@@ -521,31 +672,70 @@ function ModuleScreen({ domainName, modulePhase, quizAnswers, quizSubmitted, onA
           </h2>
         </div>
 
-        <div className="progress-bar" style={{ marginBottom: '1.5rem' }}>
-          <div className="progress-fill" style={{ width: `${((conceptIdx + 1) / mod.concepts.length) * 100}%`, background: color }} />
+        {/* Progress dots */}
+        <div style={{ display: 'flex', gap: 6, marginBottom: '1.25rem', alignItems: 'center' }}>
+          {mod.concepts.map((_,i) => (
+            <div key={i} onClick={() => setConceptIdx(i)} style={{
+              height: 8, borderRadius: 99, cursor: 'pointer', flexShrink: 0,
+              width: i === conceptIdx ? 28 : 8,
+              background: i <= conceptIdx ? ctype.color : '#e2e8f0',
+              transition: 'all .3s ease',
+            }}/>
+          ))}
+          <span style={{ fontSize: '.78rem', color: '#94a3b8', marginLeft: 6 }}>{conceptIdx + 1} / {mod.concepts.length}</span>
         </div>
 
-        <div style={{ marginBottom: '1.25rem', borderRadius: 12, overflow: 'hidden', border: `1px solid ${ctype.border}`, boxShadow: '0 2px 10px rgba(0,0,0,0.07)' }}>
-          <div style={{ background: ctype.bg, padding: '9px 16px', borderBottom: `1px solid ${ctype.border}`, display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 14 }}>{ctype.icon}</span>
-            <span style={{ fontSize: 11, fontWeight: 800, color: ctype.color, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{ctype.label}</span>
-          </div>
-          <div style={{ background: '#fff', padding: '1.5rem' }}>
-            <div style={{ display: 'flex', gap: '.5rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+        <div key={`${domainName}-${conceptIdx}`} className="concept-in"
+          style={{ marginBottom: '1.25rem', borderRadius: 12, overflow: 'hidden', border: `1px solid ${ctype.border}`, boxShadow: '0 2px 10px rgba(0,0,0,0.07)' }}>
+          <div style={{ background: ctype.bg, padding: '9px 16px', borderBottom: `1px solid ${ctype.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 14 }}>{ctype.icon}</span>
+              <span style={{ fontSize: 11, fontWeight: 800, color: ctype.color, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{ctype.label}</span>
+            </div>
+            <div style={{ display: 'flex', gap: '.4rem' }}>
               {mod.concepts.map((c, i) => (
                 <button key={i} onClick={() => setConceptIdx(i)} style={{
-                  padding: '.3rem .75rem', borderRadius: 99,
+                  padding: '.2rem .55rem', borderRadius: 99,
                   background: i === conceptIdx ? color : '#f1f5f9',
                   color: i === conceptIdx ? '#fff' : '#64748b',
-                  border: 'none', fontSize: '.8rem', fontWeight: 600, cursor: 'pointer',
+                  border: 'none', fontSize: '.72rem', fontWeight: 600, cursor: 'pointer',
                 }}>
-                  {i + 1}. {c.title.length > 20 ? c.title.slice(0, 18) + '…' : c.title}
+                  {i + 1}
                 </button>
               ))}
             </div>
+          </div>
+          <div style={{ background: '#fff', padding: '1.4rem 1.5rem' }}>
+            <h3 style={{ fontWeight: 800, fontSize: '1.05rem', color: ctype.color, marginBottom: '.75rem', lineHeight: 1.35 }}>{concept.title}</h3>
+            <p style={{ lineHeight: 1.78, color: '#374151', fontSize: '.93rem', whiteSpace: 'pre-wrap', margin: 0 }}>{concept.body}</p>
 
-            <h3 style={{ fontWeight: 800, fontSize: '1.1rem', color: ctype.color, marginBottom: '.75rem' }}>{concept.title}</h3>
-            <p style={{ lineHeight: 1.75, color: '#374151', fontSize: '.95rem', whiteSpace: 'pre-wrap' }}>{concept.body}</p>
+            {concept.example && (
+              <div style={{ marginTop: '1.1rem', background: '#fffbeb', borderLeft: '4px solid #f59e0b', borderRadius: '0 10px 10px 0', padding: '.85rem 1rem' }}>
+                <div style={{ fontSize: 10, fontWeight: 800, color: '#92400e', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 5 }}>
+                  <span>📋</span> Applied Example
+                </div>
+                <p style={{ fontSize: '.88rem', lineHeight: 1.7, color: '#374151', margin: 0, fontStyle: 'italic' }}>{concept.example}</p>
+              </div>
+            )}
+
+            {concept.visual && (
+              <div style={{ marginTop: '1.1rem', background: '#f8fafc', borderRadius: 10, padding: '1rem .5rem' }}>
+                <ConceptVisual type={concept.visual}/>
+              </div>
+            )}
+
+            {concept.keyTerms && concept.keyTerms.length > 0 && (
+              <div style={{ marginTop: '1.1rem' }}>
+                <div style={{ fontSize: 10, fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 5 }}>
+                  <span>🔑</span> Key Terms · tap cards to reveal definitions
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(132px,1fr))', gap: 8 }}>
+                  {concept.keyTerms.map((kt, ki) => (
+                    <KeyTermCard key={ki} term={kt.term} def={kt.def} color={ctype.color} bg={ctype.bg} border={ctype.border}/>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
