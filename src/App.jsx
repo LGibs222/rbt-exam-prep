@@ -254,6 +254,7 @@ const INITIAL = {
   pretestQuestions: [],
   pretestAnswers: {},  // index → choice
   pretestSubmitted: false,
+  skippedPretest: false,
   pretestDomainScores: null, // array of {name, total, correct, pct}
   weakDomains: [],
   // modules
@@ -274,15 +275,16 @@ const INITIAL = {
 }
 
 // ─── NavBar ───────────────────────────────────────────────────────────────────
-function NavBar({ phase, pretestSubmitted, moduleStatus, weakDomains, onNav, onReset }) {
+function NavBar({ phase, pretestSubmitted, skippedPretest, moduleStatus, weakDomains, onNav, onReset }) {
+  const studyStarted = pretestSubmitted || skippedPretest
   const allPassed = weakDomains.length > 0 && weakDomains.every(d => moduleStatus[d] === 'passed')
-  const examUnlocked = pretestSubmitted && (weakDomains.length === 0 || allPassed)
+  const examUnlocked = studyStarted && (weakDomains.length === 0 || allPassed)
 
   const navItems = [
     { id: 'welcome', label: 'Home', icon: '🏠', always: true },
     { id: 'pretest', label: 'Pretest', icon: '📝', unlock: true },
     { id: 'pretest_results', label: 'Results', icon: '📊', unlock: pretestSubmitted },
-    { id: 'modules', label: 'Study', icon: '📚', unlock: pretestSubmitted && weakDomains.length > 0 },
+    { id: 'modules', label: 'Study', icon: '📚', unlock: studyStarted && weakDomains.length > 0 },
     { id: 'exam_intro', label: 'Exam', icon: '🏁', unlock: examUnlocked },
   ]
 
@@ -336,7 +338,7 @@ function NavBar({ phase, pretestSubmitted, moduleStatus, weakDomains, onNav, onR
 }
 
 // ─── WelcomeScreen ────────────────────────────────────────────────────────────
-function WelcomeScreen({ onBegin }) {
+function WelcomeScreen({ onBegin, onSkip }) {
   return (
     <div className="page">
       <div style={{ textAlign: 'center', padding: '2.5rem 0 2rem' }}>
@@ -406,6 +408,13 @@ function WelcomeScreen({ onBegin }) {
         </button>
         <p style={{ marginTop: '.75rem', fontSize: '.82rem', color: '#94a3b8' }}>
           {PRETEST_QUESTIONS.length} questions · untimed · no feedback during test
+        </p>
+        <button onClick={onSkip}
+          style={{ marginTop: '1.1rem', padding: '.7rem 1.8rem', background: 'transparent', color: '#2c6e49', border: '2px solid #2c6e49', borderRadius: 10, fontSize: '.92rem', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+          Skip pretest — study all 6 modules →
+        </button>
+        <p style={{ marginTop: '.5rem', fontSize: '.76rem', color: '#94a3b8', maxWidth: 400, margin: '.5rem auto 0' }}>
+          Skipping unlocks every module. You'll still need to pass each quiz (≥80%) to unlock the full exam.
         </p>
       </div>
     </div>
@@ -1275,6 +1284,7 @@ export default function App() {
       <NavBar
         phase={phase}
         pretestSubmitted={state.pretestSubmitted}
+        skippedPretest={state.skippedPretest}
         moduleStatus={state.moduleStatus}
         weakDomains={state.weakDomains}
         onNav={handleNav}
@@ -1282,7 +1292,13 @@ export default function App() {
       />
 
       {phase === 'welcome' && (
-        <WelcomeScreen onBegin={() => setState(s => ({ ...s, phase: 'pretest', pretestQuestions: shuffleQuestions(PRETEST_QUESTIONS) }))} />
+        <WelcomeScreen
+          onBegin={() => setState(s => ({ ...s, phase: 'pretest', pretestQuestions: shuffleQuestions(PRETEST_QUESTIONS) }))}
+          onSkip={() => {
+            const modStatus = {}
+            DOMAIN_NAMES.forEach(d => { modStatus[d] = 'available' })
+            setState(s => ({ ...s, phase: 'modules', skippedPretest: true, weakDomains: [...DOMAIN_NAMES], moduleStatus: modStatus }))
+          }}/>
       )}
 
       {phase === 'pretest' && (
