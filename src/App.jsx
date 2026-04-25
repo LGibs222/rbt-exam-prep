@@ -250,6 +250,13 @@ function shuffleQuestions(qs) {
   return [...qs].sort(() => Math.random() - 0.5).map(shuffleQuestion)
 }
 
+function sampleDomainQuestions(domainName, count=20, excludeStems=[]) {
+  const exclude = new Set(excludeStems.map(s => (s||'').substring(0,60)))
+  const letter = LETTER_OF[domainName]
+  const pool = QUESTION_BANK.filter(q => q.domain === letter && !exclude.has(q.stem.substring(0,60)))
+  return shuffle(pool).slice(0, Math.min(count, pool.length)).map(shuffleQuestion)
+}
+
 function buildExam() {
   const result = []
   for (const [letter, count] of Object.entries(EXAM_DOMAIN_COUNTS)) {
@@ -308,6 +315,8 @@ const INITIAL = {
   examTimeLeft: EXAM_DURATION,
   examSubmitted: false,
   examDomainScores: null,
+  // domain spot-check
+  domainQuizDomain: null, domainQuizQuestions: [], domainQuizAnswers: {}, domainQuizCurrentIdx: 0,
   // study stats
   stats: { daysStudied:[], todayDate:'', todayMinutes:0, totalMinutes:0, modulesPassed:0, pretestsCompleted:0, examAttempts:0 },
 }
@@ -674,14 +683,14 @@ function PretestResultsScreen({ domainScores, weakDomains, onStudy, onSkip }) {
 }
 
 // ─── ModulesScreen ────────────────────────────────────────────────────────────
-function ModulesScreen({ weakDomains, moduleStatus, onSelectModule, onStartExam }) {
+function ModulesScreen({ weakDomains, moduleStatus, onSelectModule, onStartExam, onSpotCheck }) {
   const allPassed = weakDomains.length > 0 && weakDomains.every(d => moduleStatus[d] === 'passed')
 
   return (
     <div className="page">
       <h2 style={{ fontSize: '1.5rem', fontWeight: 800, marginBottom: '.4rem' }}>Study Plan</h2>
       <p style={{ color: '#64748b', marginBottom: '1.5rem' }}>
-        Complete each module to unlock the full exam. Pass the quiz (≥4/5) to mark a domain complete.
+        Pass each 5-Q module quiz to unlock the full exam — or run a 20-Q domain spot-check anytime.
       </p>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(260px,1fr))', gap: '1rem', marginBottom: '1.75rem' }}>
@@ -689,8 +698,7 @@ function ModulesScreen({ weakDomains, moduleStatus, onSelectModule, onStartExam 
           const status = moduleStatus[dn] || 'available'
           const color = DOMAIN_COLORS[dn]
           return (
-            <div key={dn} className="card" style={{ padding: '1.5rem', borderTop: `4px solid ${color}`, cursor: 'pointer' }}
-              onClick={() => onSelectModule(dn)}>
+            <div key={dn} className="card" style={{ padding: '1.5rem', borderTop: `4px solid ${color}` }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '.75rem' }}>
                 <span style={{ fontSize: '2rem' }}>{DOMAIN_ICONS[dn]}</span>
                 {status === 'passed'
@@ -702,12 +710,22 @@ function ModulesScreen({ weakDomains, moduleStatus, onSelectModule, onStartExam 
               <p style={{ fontSize: '.8rem', color: '#94a3b8', marginBottom: '.9rem' }}>
                 4 concept cards · 5 practice questions
               </p>
-              <button
-                className={`btn btn-sm ${status === 'passed' ? 'btn-ghost' : 'btn-primary'}`}
-                style={{ width: '100%', ...(status !== 'passed' ? { background: color, borderColor: color } : {}) }}
-              >
-                {status === 'passed' ? '↺ Review Again' : '▶ Start Module'}
-              </button>
+              <div style={{ display: 'flex', gap: '.5rem', flexDirection: 'column' }}>
+                <button
+                  onClick={() => onSelectModule(dn)}
+                  className={`btn btn-sm ${status === 'passed' ? 'btn-ghost' : 'btn-primary'}`}
+                  style={{ width: '100%', ...(status !== 'passed' ? { background: color, borderColor: color } : {}) }}
+                >
+                  {status === 'passed' ? '📖 Review Concepts' : '▶ Start Module'}
+                </button>
+                <button
+                  onClick={() => onSpotCheck(dn)}
+                  className="btn btn-sm"
+                  style={{ width: '100%', background: '#fff', color: color, border: `1.5px solid ${color}`, fontWeight: 700 }}
+                >
+                  🎯 Spot-Check 20Q
+                </button>
+              </div>
             </div>
           )
         })}
@@ -1120,6 +1138,102 @@ function ExamScreen({ questions, answers, flagged, timeLeft, onAnswer, onFlag, o
           ⏱ Time's up! Your exam has been submitted automatically.
         </div>
       )}
+    </div>
+  )
+}
+
+// ─── DomainQuizScreen (taking the spot-check) ─────────────────────────────────
+function DomainQuizScreen({ domainName, questions, answers, currentIdx, onAnswer, onNav, onSubmit, onBack }) {
+  const total = questions.length
+  const answered = Object.keys(answers).length
+  const q = questions[currentIdx]
+  const color = DOMAIN_COLORS[domainName]
+  if (!q) return <div className="page"><p>No questions available.</p></div>
+  return (
+    <div className="page">
+      <button className="btn btn-ghost btn-sm" onClick={onBack} style={{ marginBottom: '.75rem' }}>← Back to Study Plan</button>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', gap: 8, flexWrap: 'wrap' }}>
+        <h2 style={{ fontSize: '1.15rem', fontWeight: 700 }}>{DOMAIN_ICONS[domainName]} {domainName} · Spot-Check</h2>
+        <span style={{ fontSize: '.85rem', color: '#64748b' }}>{answered}/{total} answered</span>
+      </div>
+      <div className="progress-bar" style={{ marginBottom: '1.5rem' }}>
+        <div className="progress-fill" style={{ width: `${((currentIdx + 1) / total) * 100}%`, background: color }} />
+      </div>
+      <div className="card" style={{ padding: '1.75rem', marginBottom: '1.25rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', marginBottom: '1rem' }}>
+          <span style={{ fontSize: '.78rem', fontWeight: 700, color, background: `${color}18`, borderRadius: 6, padding: '.15rem .55rem' }}>
+            Q{currentIdx + 1} of {total}
+          </span>
+        </div>
+        <p style={{ fontSize: '1rem', fontWeight: 500, marginBottom: '1.25rem', lineHeight: 1.65 }}>{q.stem}</p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '.6rem' }}>
+          {q.options.map((opt, i) => {
+            const selected = answers[currentIdx] === i
+            return (
+              <button key={i} onClick={() => onAnswer(currentIdx, i)} style={{
+                textAlign: 'left', padding: '.85rem 1.1rem',
+                border: `2px solid ${selected ? color : '#e2e8f0'}`,
+                background: selected ? `${color}18` : '#fff',
+                borderRadius: 8, fontSize: '.92rem', cursor: 'pointer',
+                transition: 'all .12s', fontFamily: 'inherit',
+                display: 'flex', alignItems: 'flex-start', gap: '.75rem',
+              }}>
+                <span style={{
+                  minWidth: 26, height: 26, borderRadius: '50%',
+                  background: selected ? color : '#f1f5f9',
+                  color: selected ? '#fff' : '#64748b',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: '.78rem', fontWeight: 700, flexShrink: 0, marginTop: '.05rem',
+                }}>
+                  {String.fromCharCode(65 + i)}
+                </span>
+                <span>{opt}</span>
+              </button>
+            )
+          })}
+        </div>
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '.5rem' }}>
+        <button className="btn btn-ghost btn-sm" onClick={() => onNav(-1)} disabled={currentIdx === 0}>← Prev</button>
+        {currentIdx < total - 1
+          ? <button className="btn btn-primary btn-sm" onClick={() => onNav(1)} style={{ background: color, borderColor: color }}>Next →</button>
+          : <button className="btn btn-primary" onClick={onSubmit} disabled={answered < total} style={{ background: answered < total ? '#94a3b8' : color, borderColor: answered < total ? '#94a3b8' : color }}>
+              {answered < total ? `${total - answered} left` : 'Submit Spot-Check ✓'}
+            </button>
+        }
+      </div>
+    </div>
+  )
+}
+
+// ─── DomainQuizResultsScreen ──────────────────────────────────────────────────
+function DomainQuizResultsScreen({ domainName, questions, answers, onReview, onTryAnother, onBack }) {
+  const correct = questions.filter((q, i) => answers[i] === q.correct).length
+  const total = questions.length
+  const percent = Math.round((correct / total) * 100)
+  const passed = percent >= 80
+  const color = DOMAIN_COLORS[domainName]
+  return (
+    <div className="page" style={{ textAlign: 'center', padding: '2.5rem 1.25rem' }}>
+      <div style={{ fontSize: '3rem', marginBottom: '.5rem' }}>{DOMAIN_ICONS[domainName]}</div>
+      <h2 style={{ fontWeight: 800, fontSize: '1.4rem', marginBottom: '.25rem' }}>Spot-Check Complete</h2>
+      <p style={{ color: '#64748b', marginBottom: '1.5rem' }}>{domainName}</p>
+      <div className="card" style={{
+        padding: '1.75rem', marginBottom: '1.5rem', textAlign: 'center',
+        borderTop: `4px solid ${passed ? '#16a34a' : '#dc2626'}`,
+        background: passed ? '#f0fdf4' : '#fef2f2',
+      }}>
+        <div style={{ fontSize: '3rem', fontWeight: 900, color: passed ? '#16a34a' : '#dc2626' }}>{percent}%</div>
+        <p style={{ fontSize: '1rem', fontWeight: 700, color: passed ? '#16a34a' : '#dc2626', marginTop: '.4rem' }}>{correct} / {total} correct</p>
+        <p style={{ color: passed ? '#16a34a' : '#dc2626', fontSize: '.85rem', marginTop: '.3rem', opacity: 0.8 }}>
+          {passed ? '✓ Strong on this domain' : 'Needs more review'}
+        </p>
+      </div>
+      <div style={{ display: 'flex', gap: '.75rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+        <button className="btn btn-primary" onClick={onReview} style={{ background: color, borderColor: color }}>📖 Review Questions</button>
+        <button className="btn btn-secondary" onClick={onTryAnother} style={{ borderColor: color, color }}>↻ New 20 Questions</button>
+        <button className="btn btn-ghost" onClick={onBack}>← Back to Study Plan</button>
+      </div>
     </div>
   )
 }
@@ -1588,6 +1702,45 @@ export default function App() {
           moduleStatus={state.moduleStatus}
           onSelectModule={handleSelectModule}
           onStartExam={handleStartExam}
+          onSpotCheck={(dn) => {
+            const qs = sampleDomainQuestions(dn, 20, PRETEST_QUESTIONS.map(q => q.stem))
+            setState(s => ({ ...s, phase: 'domain_quiz', domainQuizDomain: dn, domainQuizQuestions: qs, domainQuizAnswers: {}, domainQuizCurrentIdx: 0 }))
+          }}
+        />
+      )}
+
+      {phase === 'domain_quiz' && state.domainQuizQuestions.length > 0 && (
+        <DomainQuizScreen
+          domainName={state.domainQuizDomain}
+          questions={state.domainQuizQuestions}
+          answers={state.domainQuizAnswers}
+          currentIdx={state.domainQuizCurrentIdx}
+          onAnswer={(i, a) => setState(s => ({ ...s, domainQuizAnswers: { ...s.domainQuizAnswers, [i]: a } }))}
+          onNav={(d) => setState(s => ({ ...s, domainQuizCurrentIdx: Math.max(0, Math.min(s.domainQuizQuestions.length - 1, s.domainQuizCurrentIdx + d)) }))}
+          onSubmit={() => setState(s => ({ ...s, phase: 'domain_quiz_results' }))}
+          onBack={() => setState(s => ({ ...s, phase: 'modules' }))}
+        />
+      )}
+
+      {phase === 'domain_quiz_results' && state.domainQuizQuestions.length > 0 && (
+        <DomainQuizResultsScreen
+          domainName={state.domainQuizDomain}
+          questions={state.domainQuizQuestions}
+          answers={state.domainQuizAnswers}
+          onReview={() => setState(s => ({ ...s, phase: 'domain_quiz_review' }))}
+          onTryAnother={() => {
+            const qs = sampleDomainQuestions(state.domainQuizDomain, 20, PRETEST_QUESTIONS.map(q => q.stem))
+            setState(s => ({ ...s, phase: 'domain_quiz', domainQuizQuestions: qs, domainQuizAnswers: {}, domainQuizCurrentIdx: 0 }))
+          }}
+          onBack={() => setState(s => ({ ...s, phase: 'modules' }))}
+        />
+      )}
+
+      {phase === 'domain_quiz_review' && state.domainQuizQuestions.length > 0 && (
+        <ExamReviewScreen
+          examQuestions={state.domainQuizQuestions}
+          examAnswers={state.domainQuizAnswers}
+          onBack={() => setState(s => ({ ...s, phase: 'domain_quiz_results' }))}
         />
       )}
 
