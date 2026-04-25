@@ -306,9 +306,13 @@ const DOMAIN_ICONS = {
   'Ethics': '⚖️',
 }
 
-// Exam proportions per domain (75 total)
-const EXAM_DOMAIN_COUNTS = { A: 12, B: 9, C: 19, D: 14, E: 10, F: 11 }
-const EXAM_DURATION = 90 * 60 // seconds
+// Official RBT 3rd Edition Test Content Outline (2026+)
+// 75 scored questions distributed across 6 domains, plus 10 unscored pilot questions = 85 total
+const EXAM_DOMAIN_COUNTS = { A: 13, B: 8, C: 19, D: 14, E: 10, F: 11 }  // 75 scored
+const RBT_PILOT_QUESTIONS = 10
+const RBT_TOTAL_QUESTIONS = 85  // 75 scored + 10 pilot
+const RBT_SCORED_QUESTIONS = 75
+const EXAM_DURATION = 90 * 60 // 90 min seat time per BACB
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 function shuffle(arr) {
@@ -338,12 +342,19 @@ function sampleDomainQuestions(domainName, count=20, excludeStems=[]) {
 }
 
 function buildExam() {
+  const used = new Set()
   const result = []
+  // Sample by official scored proportions (75 questions)
   for (const [letter, count] of Object.entries(EXAM_DOMAIN_COUNTS)) {
-    const pool = QUESTION_BANK.filter(q => q.domain === letter)
+    const pool = QUESTION_BANK.filter(q => q.domain === letter && !used.has(q))
     const picked = shuffle(pool).slice(0, count)
+    picked.forEach(q => used.add(q))
     result.push(...picked)
   }
+  // Add 10 pilot questions sampled randomly across all domains
+  const remaining = QUESTION_BANK.filter(q => !used.has(q))
+  const pilots = shuffle(remaining).slice(0, RBT_PILOT_QUESTIONS)
+  result.push(...pilots)
   return shuffle(result).map(shuffleQuestion)
 }
 
@@ -533,7 +544,7 @@ function WelcomeScreen({ onBegin, onSkip, stats, weakSpotsCount, onReviewWeakSpo
             { step: '1', icon: '📝', title: 'Diagnostic Pretest', desc: '24 questions across all 6 domains' },
             { step: '2', icon: '📊', title: 'Identify Weak Areas', desc: 'Domains below 70% get targeted review' },
             { step: '3', icon: '📚', title: 'Study Modules', desc: 'Read concepts, then pass an 80% quiz' },
-            { step: '4', icon: '🏁', title: 'Full 75-Question Exam', desc: '90 minutes · 70% to pass' },
+            { step: '4', icon: '🏁', title: 'Full 85-Question Exam', desc: '75 scored + 10 pilot · 90 min · ~70% to pass' },
           ].map(({ step, icon, title, desc }) => (
             <div key={step} style={{
               background: '#f8fafc', border: '1px solid #e2e8f0',
@@ -1072,9 +1083,9 @@ function ExamIntroScreen({ onBegin }) {
       <div className="card" style={{ padding: '1.75rem', marginBottom: '2rem', textAlign: 'left', maxWidth: 480, margin: '0 auto 2rem' }}>
         <div style={{ display: 'grid', gap: '.75rem' }}>
           {[
-            { icon: '❓', label: '75 Questions', sub: 'Proportional across all 6 domains' },
+            { icon: '❓', label: '85 Questions', sub: '75 scored + 10 pilot · official 3rd Ed proportions' },
             { icon: '⏱', label: '90 Minutes', sub: 'Countdown timer shown throughout' },
-            { icon: '🎯', label: '70% to Pass', sub: '53 or more correct answers' },
+            { icon: '🎯', label: '~70% to Pass', sub: '~60 of 85 correct (BACB sets exact scaled cutoff)' },
             { icon: '🚩', label: 'Flag for Review', sub: 'Mark questions to revisit' },
           ].map(({ icon, label, sub }) => (
             <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '.6rem .75rem', background: '#f8fafc', borderRadius: 8 }}>
@@ -1847,7 +1858,7 @@ function FinalResultsScreen({ examQuestions, examAnswers, examDomainScores, pret
   return (
     <div className="page">
       <h2 style={{ fontSize: '1.5rem', fontWeight: 800, marginBottom: '.5rem' }}>Final Results</h2>
-      <p style={{ color: '#64748b', marginBottom: '1.5rem' }}>Full Practice Exam · 75 Questions</p>
+      <p style={{ color: '#64748b', marginBottom: '1.5rem' }}>Full Practice Exam · 85 Questions (75 scored + 10 pilot)</p>
 
       <div className="card" style={{
         padding: '2rem', marginBottom: '1.5rem', textAlign: 'center',
@@ -1857,7 +1868,7 @@ function FinalResultsScreen({ examQuestions, examAnswers, examDomainScores, pret
         <p style={{ fontSize: '1.1rem', fontWeight: 700, color: passed ? '#16a34a' : '#dc2626', marginTop: '.3rem' }}>
           {passed ? '✓ PASSED' : '✗ NOT PASSED'}
         </p>
-        <p style={{ color: '#64748b', marginTop: '.3rem' }}>{correct} / {total} correct · Need 70% (≥53) to pass</p>
+        <p style={{ color: '#64748b', marginTop: '.3rem' }}>{correct} / {total} correct · Need ~70% to pass</p>
       </div>
 
       <div className="card" style={{ padding: '1.75rem', marginBottom: '1.5rem' }}>
