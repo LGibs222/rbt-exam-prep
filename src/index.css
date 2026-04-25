@@ -7,6 +7,7 @@
   --accent: #40916c;
   --bg: #f8fafc;
   --surface: #ffffff;
+  --surface-alt: #f1f5f9;
   --border: #e2e8f0;
   --text: #1e293b;
   --text-muted: #64748b;
@@ -17,6 +18,29 @@
   --shadow: 0 1px 3px rgba(0,0,0,.1), 0 1px 2px rgba(0,0,0,.06);
   --shadow-md: 0 4px 6px rgba(0,0,0,.07), 0 2px 4px rgba(0,0,0,.06);
 }
+
+:root[data-theme="dark"] {
+  --primary: #4ade80;
+  --primary-dark: #16a34a;
+  --primary-light: rgba(44, 110, 73, 0.32);
+  --accent: #6ee7b7;
+  --bg: #0f172a;
+  --surface: #1e293b;
+  --surface-alt: #0b1220;
+  --border: #334155;
+  --text: #f1f5f9;
+  --text-muted: #94a3b8;
+  --danger: #fca5a5;
+  --success: #4ade80;
+  --warning: #fbbf24;
+  --shadow: 0 1px 3px rgba(0,0,0,.4), 0 1px 2px rgba(0,0,0,.3);
+  --shadow-md: 0 4px 6px rgba(0,0,0,.4), 0 2px 4px rgba(0,0,0,.3);
+}
+
+html, body { background: var(--bg); color: var(--text); transition: background .25s ease, color .25s ease; }
+
+/* In dark mode, keep the SVG visual cards near-white so labels stay readable */
+:root[data-theme="dark"] .visual-card { background: #f1f5f9 !important; }
 
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;

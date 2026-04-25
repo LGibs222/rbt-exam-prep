@@ -173,9 +173,9 @@ function KeyTermCard({term,def,color,bg,border}) {
           <span style={{fontSize:13,fontWeight:800,color,textAlign:'center',lineHeight:1.3}}>{term}</span>
         </div>
         <div style={{position:'absolute',inset:0,backfaceVisibility:'hidden',WebkitBackfaceVisibility:'hidden',
-          transform:'rotateY(180deg)',background:'#fff',border:`1.5px solid ${border}`,borderRadius:10,
+          transform:'rotateY(180deg)',background:'var(--surface)',border:`1.5px solid ${border}`,borderRadius:10,
           display:'flex',alignItems:'center',justifyContent:'center',padding:'8px 12px',minHeight:72}}>
-          <span style={{fontSize:12,color:'#1e293b',textAlign:'center',lineHeight:1.5}}>{def}</span>
+          <span style={{fontSize:12,color:'var(--text)',textAlign:'center',lineHeight:1.5}}>{def}</span>
         </div>
       </div>
     </div>
@@ -414,6 +414,8 @@ const INITIAL = {
   safmeds: { totalTokens:0, decks:{}, history:[], lastDeckId:'beginner', lastTimer:60, lastMode:'timed' },
   // SAFMEDS transient session
   sfxDeckId:null, sfxMode:'timed', sfxTimer:60, sfxCards:[], sfxCardIdx:0, sfxRevealed:false, sfxCorrect:0, sfxMissed:0, sfxRemaining:60, sfxResults:null,
+  // theme: 'light' | 'dark'
+  theme: 'light',
   // study stats
   stats: { daysStudied:[], todayDate:'', todayMinutes:0, totalMinutes:0, modulesPassed:0, pretestsCompleted:0, examAttempts:0 },
 }
@@ -432,19 +434,19 @@ function StatsCard({ stats }) {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, gap: 10, flexWrap: 'wrap' }}>
         <h3 style={{ fontSize: 13, fontWeight: 800, color: '#166534', margin: 0, textTransform: 'uppercase', letterSpacing: '0.06em' }}>📊 Your Progress</h3>
         {streak > 0 && (
-          <div style={{ fontSize: 12, fontWeight: 800, color: '#166534', background: '#fff', padding: '4px 11px', borderRadius: 99, border: '1.5px solid #86efac', whiteSpace: 'nowrap' }}>
+          <div style={{ fontSize: 12, fontWeight: 800, color: '#166534', background: 'var(--surface)', padding: '4px 11px', borderRadius: 99, border: '1.5px solid #86efac', whiteSpace: 'nowrap' }}>
             🔥 {streak}-day streak
           </div>
         )}
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 14px', fontSize: 13, color: '#1e293b' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 14px', fontSize: 13, color: 'var(--text)' }}>
         <div>📅 <strong>{days}</strong> day{days === 1 ? '' : 's'} studied</div>
         <div>⏱️ Today: <strong>{formatDuration(stats?.todayMinutes || 0)}</strong></div>
         <div>✓ <strong>{stats?.modulesPassed || 0}</strong> quiz{(stats?.modulesPassed || 0) === 1 ? '' : 'zes'} passed</div>
         <div>🕐 Total: <strong>{formatDuration(stats?.totalMinutes || 0)}</strong></div>
       </div>
       {((stats?.pretestsCompleted || 0) > 0 || (stats?.examAttempts || 0) > 0) && (
-        <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid #86efac', fontSize: 12, color: '#64748b' }}>
+        <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid #86efac', fontSize: 12, color: 'var(--text-muted)' }}>
           {(stats?.pretestsCompleted || 0) > 0 && <span style={{ marginRight: 14 }}>📝 {stats.pretestsCompleted} pretest{stats.pretestsCompleted === 1 ? '' : 's'}</span>}
           {(stats?.examAttempts || 0) > 0 && <span>🏁 {stats.examAttempts} exam attempt{stats.examAttempts === 1 ? '' : 's'}</span>}
         </div>
@@ -454,7 +456,7 @@ function StatsCard({ stats }) {
 }
 
 // ─── NavBar ───────────────────────────────────────────────────────────────────
-function NavBar({ phase, pretestSubmitted, skippedPretest, moduleStatus, weakDomains, onNav, onReset }) {
+function NavBar({ phase, pretestSubmitted, skippedPretest, moduleStatus, weakDomains, onNav, onReset, theme, onToggleTheme }) {
   const studyStarted = pretestSubmitted || skippedPretest
   const allPassed = weakDomains.length > 0 && weakDomains.every(d => moduleStatus[d] === 'passed')
   const examUnlocked = studyStarted && (weakDomains.length === 0 || allPassed)
@@ -505,13 +507,23 @@ function NavBar({ phase, pretestSubmitted, skippedPretest, moduleStatus, weakDom
             )
           })}
         </div>
-        <button
-          onClick={onReset}
-          className="btn btn-sm"
-          style={{ background: 'rgba(255,255,255,.15)', color: '#fff', borderColor: 'rgba(255,255,255,.3)', fontSize: '.78rem' }}
-        >
-          ↺ Reset
-        </button>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          <button
+            onClick={onToggleTheme}
+            title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+            className="btn btn-sm"
+            style={{ background: 'rgba(255,255,255,.15)', color: '#fff', borderColor: 'rgba(255,255,255,.3)', fontSize: '.95rem', padding: '.35rem .65rem', lineHeight: 1 }}
+          >
+            {theme === 'dark' ? '☀️' : '🌙'}
+          </button>
+          <button
+            onClick={onReset}
+            className="btn btn-sm"
+            style={{ background: 'rgba(255,255,255,.15)', color: '#fff', borderColor: 'rgba(255,255,255,.3)', fontSize: '.78rem' }}
+          >
+            ↺ Reset
+          </button>
+        </div>
       </div>
     </nav>
   )
@@ -526,7 +538,7 @@ function WelcomeScreen({ onBegin, onSkip, stats, weakSpotsCount, onReviewWeakSpo
         <h1 style={{ fontSize: '2.2rem', fontWeight: 800, color: '#2c6e49', marginBottom: '.5rem' }}>
           RBT Exam Prep
         </h1>
-        <p style={{ fontSize: '1.1rem', color: '#64748b', maxWidth: 480, margin: '0 auto 2rem' }}>
+        <p style={{ fontSize: '1.1rem', color: 'var(--text-muted)', maxWidth: 480, margin: '0 auto 2rem' }}>
           3rd Edition Task List · Adaptive Study System
         </p>
       </div>
@@ -536,7 +548,7 @@ function WelcomeScreen({ onBegin, onSkip, stats, weakSpotsCount, onReviewWeakSpo
       <SafmedsCard safmeds={safmeds} onOpen={onOpenSafmeds}/>
 
       <div className="card" style={{ padding: '1.75rem', marginBottom: '1.5rem' }}>
-        <h2 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '1rem', color: '#1e293b' }}>
+        <h2 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '1rem', color: 'var(--text)' }}>
           How This Works
         </h2>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: '1rem' }}>
@@ -547,7 +559,7 @@ function WelcomeScreen({ onBegin, onSkip, stats, weakSpotsCount, onReviewWeakSpo
             { step: '4', icon: '🏁', title: 'Full 85-Question Exam', desc: '75 scored + 10 pilot · 90 min · ~70% to pass' },
           ].map(({ step, icon, title, desc }) => (
             <div key={step} style={{
-              background: '#f8fafc', border: '1px solid #e2e8f0',
+              background: 'var(--surface-alt)', border: '1px solid var(--border)',
               borderRadius: 10, padding: '1rem', textAlign: 'center',
             }}>
               <div style={{ fontSize: '2rem', marginBottom: '.5rem' }}>{icon}</div>
@@ -557,7 +569,7 @@ function WelcomeScreen({ onBegin, onSkip, stats, weakSpotsCount, onReviewWeakSpo
                 fontSize: '.75rem', fontWeight: 800, marginBottom: '.5rem',
               }}>{step}</div>
               <p style={{ fontWeight: 700, fontSize: '.9rem', marginBottom: '.25rem' }}>{title}</p>
-              <p style={{ fontSize: '.8rem', color: '#64748b' }}>{desc}</p>
+              <p style={{ fontSize: '.8rem', color: 'var(--text-muted)' }}>{desc}</p>
             </div>
           ))}
         </div>
@@ -569,7 +581,7 @@ function WelcomeScreen({ onBegin, onSkip, stats, weakSpotsCount, onReviewWeakSpo
           {DOMAIN_NAMES.map(dn => (
             <div key={dn} style={{
               display: 'flex', alignItems: 'center', gap: '.75rem',
-              padding: '.75rem 1rem', background: '#f8fafc',
+              padding: '.75rem 1rem', background: 'var(--surface-alt)',
               border: `1.5px solid ${DOMAIN_COLORS[dn]}22`,
               borderLeft: `4px solid ${DOMAIN_COLORS[dn]}`,
               borderRadius: 8,
@@ -617,7 +629,7 @@ function PretestScreen({ questions, answers, onAnswer, onSubmit, onBack }) {
     <div className="page">
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
         <h2 style={{ fontSize: '1.15rem', fontWeight: 700 }}>Diagnostic Pretest</h2>
-        <span style={{ fontSize: '.85rem', color: '#64748b' }}>{answered}/{total} answered</span>
+        <span style={{ fontSize: '.85rem', color: 'var(--text-muted)' }}>{answered}/{total} answered</span>
       </div>
 
       <div className="progress-bar" style={{ marginBottom: '1.5rem' }}>
@@ -715,11 +727,11 @@ function PretestResultsScreen({ domainScores, weakDomains, onStudy, onSkip }) {
   return (
     <div className="page">
       <h2 style={{ fontSize: '1.5rem', fontWeight: 800, marginBottom: '.5rem' }}>Pretest Results</h2>
-      <p style={{ color: '#64748b', marginBottom: '1.5rem' }}>Here's how you did across all 6 domains</p>
+      <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem' }}>Here's how you did across all 6 domains</p>
 
       <div className="card" style={{ padding: '1.75rem', marginBottom: '1.25rem', textAlign: 'center' }}>
         <div style={{ fontSize: '3rem', fontWeight: 900, color: overall >= 70 ? '#16a34a' : '#dc2626' }}>{overall}%</div>
-        <p style={{ color: '#64748b', fontSize: '.9rem' }}>{totalC} / {totalQ} correct</p>
+        <p style={{ color: 'var(--text-muted)', fontSize: '.9rem' }}>{totalC} / {totalQ} correct</p>
         <p style={{ marginTop: '.5rem', fontWeight: 600, color: overall >= 70 ? '#16a34a' : '#dc2626' }}>
           {overall >= 70 ? '✓ Strong baseline — ready to proceed!' : '⚠ Some domains need review before your exam'}
         </p>
@@ -733,7 +745,7 @@ function PretestResultsScreen({ domainScores, weakDomains, onStudy, onSkip }) {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '.35rem' }}>
                 <span style={{ fontSize: '.88rem', fontWeight: 600 }}>{DOMAIN_ICONS[d.name]} {d.name}</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem' }}>
-                  <span style={{ fontSize: '.82rem', color: '#64748b' }}>{d.correct}/{d.total}</span>
+                  <span style={{ fontSize: '.82rem', color: 'var(--text-muted)' }}>{d.correct}/{d.total}</span>
                   <span style={{
                     fontSize: '.82rem', fontWeight: 700,
                     color: d.pct === null ? '#94a3b8' : d.pct >= 70 ? '#16a34a' : '#dc2626',
@@ -789,7 +801,7 @@ function ModulesScreen({ weakDomains, moduleStatus, onSelectModule, onStartExam,
   return (
     <div className="page">
       <h2 style={{ fontSize: '1.5rem', fontWeight: 800, marginBottom: '.4rem' }}>Study Plan</h2>
-      <p style={{ color: '#64748b', marginBottom: '1.5rem' }}>
+      <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem' }}>
         Pass each 5-Q module quiz to unlock the full exam — or run a 20-Q domain spot-check anytime.
       </p>
 
@@ -821,7 +833,7 @@ function ModulesScreen({ weakDomains, moduleStatus, onSelectModule, onStartExam,
                 <button
                   onClick={() => onSpotCheck(dn)}
                   className="btn btn-sm"
-                  style={{ width: '100%', background: '#fff', color: color, border: `1.5px solid ${color}`, fontWeight: 700 }}
+                  style={{ width: '100%', background: 'var(--surface)', color: color, border: `1.5px solid ${color}`, fontWeight: 700 }}
                 >
                   🎯 Spot-Check 20Q
                 </button>
@@ -907,7 +919,7 @@ function ModuleScreen({ domainName, modulePhase, quizAnswers, quizSubmitted, onA
               ))}
             </div>
           </div>
-          <div style={{ background: '#fff', padding: '1.4rem 1.5rem' }}>
+          <div style={{ background: 'var(--surface)', padding: '1.4rem 1.5rem' }}>
             <h3 style={{ fontWeight: 800, fontSize: '1.05rem', color: ctype.color, marginBottom: '.75rem', lineHeight: 1.35 }}>{concept.title}</h3>
             <p style={{ lineHeight: 1.78, color: '#374151', fontSize: '.93rem', whiteSpace: 'pre-wrap', margin: 0 }}>{concept.body}</p>
 
@@ -921,14 +933,14 @@ function ModuleScreen({ domainName, modulePhase, quizAnswers, quizSubmitted, onA
             )}
 
             {concept.visual && (
-              <div style={{ marginTop: '1.1rem', background: '#f8fafc', borderRadius: 10, padding: '1rem .5rem' }}>
+              <div className="visual-card" style={{ marginTop: '1.1rem', background: 'var(--surface-alt)', borderRadius: 10, padding: '1rem .5rem' }}>
                 <ConceptVisual type={concept.visual}/>
               </div>
             )}
 
             {concept.keyTerms && concept.keyTerms.length > 0 && (
               <div style={{ marginTop: '1.1rem' }}>
-                <div style={{ fontSize: 10, fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 5 }}>
+                <div style={{ fontSize: 10, fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 5 }}>
                   <span>🔑</span> Key Terms · tap cards to reveal definitions
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(132px,1fr))', gap: 8 }}>
@@ -972,11 +984,11 @@ function ModuleScreen({ domainName, modulePhase, quizAnswers, quizSubmitted, onA
           <p style={{ fontSize: '1.1rem', fontWeight: 700, color: passed ? '#16a34a' : '#dc2626', marginTop: '.4rem' }}>
             {passed ? '✓ Passed! Domain unlocked.' : '✗ Not quite — review and retry'}
           </p>
-          <p style={{ color: '#64748b', fontSize: '.88rem', marginTop: '.3rem' }}>Need ≥ 4/5 (80%) to pass</p>
+          <p style={{ color: 'var(--text-muted)', fontSize: '.88rem', marginTop: '.3rem' }}>Need ≥ 4/5 (80%) to pass</p>
         </div>
 
         {!passed && (
-          <div style={{ fontSize: 11, fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
             <span>🔍</span> Review your {totalQ - correct} missed question{(totalQ - correct) > 1 ? 's' : ''} before retrying
           </div>
         )}
@@ -993,7 +1005,7 @@ function ModuleScreen({ domainName, modulePhase, quizAnswers, quizSubmitted, onA
                 </span> {chosen !== undefined ? q.options[chosen] : 'No answer'}
               </p>
               {!isCorrect && <p style={{ fontSize: '.85rem', color: '#16a34a', marginBottom: '.35rem' }}>✓ Correct: {q.options[q.correct]}</p>}
-              <p style={{ fontSize: '.82rem', color: '#64748b', background: '#f8fafc', padding: '.5rem .75rem', borderRadius: 6, marginTop: '.4rem' }}>
+              <p style={{ fontSize: '.82rem', color: 'var(--text-muted)', background: 'var(--surface-alt)', padding: '.5rem .75rem', borderRadius: 6, marginTop: '.4rem' }}>
                 💡 {q.rationale}
               </p>
             </div>
@@ -1021,7 +1033,7 @@ function ModuleScreen({ domainName, modulePhase, quizAnswers, quizSubmitted, onA
     <div className="page">
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
         <h2 style={{ fontWeight: 800, color, fontSize: '1.1rem' }}>{DOMAIN_ICONS[domainName]} Module Quiz</h2>
-        <span style={{ fontSize: '.85rem', color: '#64748b' }}>Q{quizIdx + 1} of {totalQ}</span>
+        <span style={{ fontSize: '.85rem', color: 'var(--text-muted)' }}>Q{quizIdx + 1} of {totalQ}</span>
       </div>
 
       <div className="progress-bar" style={{ marginBottom: '1.5rem' }}>
@@ -1076,7 +1088,7 @@ function ExamIntroScreen({ onBegin }) {
     <div className="page" style={{ textAlign: 'center' }}>
       <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>🏁</div>
       <h2 style={{ fontSize: '2rem', fontWeight: 800, marginBottom: '.5rem' }}>Full Practice Exam</h2>
-      <p style={{ color: '#64748b', marginBottom: '2rem', fontSize: '1rem' }}>
+      <p style={{ color: 'var(--text-muted)', marginBottom: '2rem', fontSize: '1rem' }}>
         RBT 3rd Edition Task List · Mock Exam
       </p>
 
@@ -1088,11 +1100,11 @@ function ExamIntroScreen({ onBegin }) {
             { icon: '🎯', label: '~70% to Pass', sub: '~60 of 85 correct (BACB sets exact scaled cutoff)' },
             { icon: '🚩', label: 'Flag for Review', sub: 'Mark questions to revisit' },
           ].map(({ icon, label, sub }) => (
-            <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '.6rem .75rem', background: '#f8fafc', borderRadius: 8 }}>
+            <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '.6rem .75rem', background: 'var(--surface-alt)', borderRadius: 8 }}>
               <span style={{ fontSize: '1.5rem' }}>{icon}</span>
               <div>
                 <p style={{ fontWeight: 700, fontSize: '.9rem' }}>{label}</p>
-                <p style={{ fontSize: '.8rem', color: '#64748b' }}>{sub}</p>
+                <p style={{ fontSize: '.8rem', color: 'var(--text-muted)' }}>{sub}</p>
               </div>
             </div>
           ))}
@@ -1127,7 +1139,7 @@ function ExamScreen({ questions, answers, flagged, timeLeft, onAnswer, onFlag, o
       }}>
         <h2 style={{ fontWeight: 800, fontSize: '1.1rem' }}>Full Exam</h2>
         <div style={{ display: 'flex', alignItems: 'center', gap: '.75rem' }}>
-          <span style={{ fontSize: '.82rem', color: '#64748b' }}>{answered}/{total} answered</span>
+          <span style={{ fontSize: '.82rem', color: 'var(--text-muted)' }}>{answered}/{total} answered</span>
           <div style={{
             background: urgent ? '#fee2e2' : '#f0fdf4',
             color: urgent ? '#dc2626' : '#166534',
@@ -1203,7 +1215,7 @@ function ExamScreen({ questions, answers, flagged, timeLeft, onAnswer, onFlag, o
       </button>
 
       {showNav && (
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.3rem', marginBottom: '1rem', padding: '1rem', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.3rem', marginBottom: '1rem', padding: '1rem', background: 'var(--surface-alt)', borderRadius: 8, border: '1px solid var(--border)' }}>
           {questions.map((_, i) => (
             <button key={i} onClick={() => setCurrentIdx(i)} style={{
               width: 30, height: 30, borderRadius: 6,
@@ -1215,7 +1227,7 @@ function ExamScreen({ questions, answers, flagged, timeLeft, onAnswer, onFlag, o
               {i + 1}
             </button>
           ))}
-          <div style={{ width: '100%', marginTop: '.5rem', display: 'flex', gap: '1rem', fontSize: '.75rem', color: '#64748b' }}>
+          <div style={{ width: '100%', marginTop: '.5rem', display: 'flex', gap: '1rem', fontSize: '.75rem', color: 'var(--text-muted)' }}>
             <span>⬜ Unanswered</span><span style={{ color: '#16a34a' }}>🟩 Answered</span><span style={{ color: '#92400e' }}>🟨 Flagged</span>
           </div>
         </div>
@@ -1258,7 +1270,7 @@ function SelfGraph({ history }) {
   })
   return (
     <div>
-      <div style={{ fontSize: 11, fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 6 }}>📊 Your Fluency (last {recent.length} sessions)</div>
+      <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 6 }}>📊 Your Fluency (last {recent.length} sessions)</div>
       <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', display: 'block' }}>
         <line x1={padL} y1={padT} x2={padL} y2={H - padB} stroke="#e2e8f0" strokeWidth={1} />
         <line x1={padL} y1={H - padB} x2={W - 4} y2={H - padB} stroke="#e2e8f0" strokeWidth={1} />
@@ -1309,7 +1321,7 @@ function SafmedsHubScreen({ safmeds, onStart, onBack }) {
     <div className="page">
       <button className="btn btn-ghost btn-sm" onClick={onBack} style={{ marginBottom: '.75rem' }}>← Back</button>
       <h2 style={{ fontSize: '1.4rem', fontWeight: 700, color: '#5b21b6', marginBottom: '.25rem' }}>🎴 SAFMEDS Fluency Drill</h2>
-      <p style={{ color: '#64748b', marginBottom: '1.25rem', fontSize: '.9rem' }}>Say All Fast Minute Each Day Shuffled · See definition → recall term → self-grade</p>
+      <p style={{ color: 'var(--text-muted)', marginBottom: '1.25rem', fontSize: '.9rem' }}>Say All Fast Minute Each Day Shuffled · See definition → recall term → self-grade</p>
 
       <div style={{ background: 'linear-gradient(135deg, #ede9fe 0%, #f5f3ff 100%)', border: '1px solid #c4b5fd', borderRadius: 14, padding: '14px 18px', marginBottom: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
         <div>
@@ -1332,7 +1344,7 @@ function SafmedsHubScreen({ safmeds, onStart, onBack }) {
         </div>
         {mode === 'timed' && (
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-            <span style={{ fontSize: 12, color: '#64748b', marginRight: 4 }}>Timer:</span>
+            <span style={{ fontSize: 12, color: 'var(--text-muted)', marginRight: 4 }}>Timer:</span>
             {SAFMEDS_TIMERS.map(t => (
               <button key={t} onClick={() => setTimer(t)}
                 style={{ padding: '5px 12px', borderRadius: 8, border: `1px solid ${timer === t ? '#5b21b6' : '#e2e8f0'}`, background: timer === t ? '#ede9fe' : '#fff', color: timer === t ? '#5b21b6' : '#1e293b', cursor: 'pointer', fontSize: 12, fontWeight: 600, fontFamily: 'inherit' }}>
@@ -1343,7 +1355,7 @@ function SafmedsHubScreen({ safmeds, onStart, onBack }) {
         )}
       </div>
 
-      <h3 style={{ fontSize: 13, fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.07em', margin: '0 0 10px' }}>Difficulty Levels</h3>
+      <h3 style={{ fontSize: 13, fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', margin: '0 0 10px' }}>Difficulty Levels</h3>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10, marginBottom: '1.5rem' }}>
         {SAFMEDS_LEVELS.map(lvl => {
           const unlocked = isLevelUnlocked(lvl.id, tokens)
@@ -1356,15 +1368,15 @@ function SafmedsHubScreen({ safmeds, onStart, onBack }) {
                 <span style={{ fontSize: 18 }}>{unlocked ? lvl.icon : '🔒'}</span>
                 <span style={{ fontSize: 14, fontWeight: 800, color: unlocked ? lvl.color : '#64748b' }}>{lvl.label}</span>
               </div>
-              <div style={{ fontSize: 11, color: '#64748b' }}>{cards.length} cards{cards.length === 0 ? ' (loading…)' : ''}</div>
-              {!unlocked && <div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>🪙 {lvl.unlock} tokens to unlock</div>}
+              <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{cards.length} cards{cards.length === 0 ? ' (loading…)' : ''}</div>
+              {!unlocked && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>🪙 {lvl.unlock} tokens to unlock</div>}
               {unlocked && stats.high60s > 0 && <div style={{ fontSize: 11, color: lvl.color, marginTop: 4 }}>Best 60s: <strong>{stats.high60s}</strong></div>}
             </button>
           )
         })}
       </div>
 
-      <h3 style={{ fontSize: 13, fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.07em', margin: '0 0 10px' }}>Mega Deck</h3>
+      <h3 style={{ fontSize: 13, fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', margin: '0 0 10px' }}>Mega Deck</h3>
       <button onClick={() => startDeck('all')}
         style={{ width: '100%', textAlign: 'left', padding: '14px 16px', borderRadius: 12, border: '2px solid #b45309', background: '#fef3c7', marginBottom: '1.5rem', cursor: 'pointer', fontFamily: 'inherit' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
@@ -1374,11 +1386,11 @@ function SafmedsHubScreen({ safmeds, onStart, onBack }) {
         <div style={{ fontSize: 11, color: '#b45309', opacity: 0.8 }}>{getSafmedsCards('all').length} cards · every level mixed</div>
       </button>
 
-      <h3 style={{ fontSize: 13, fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.07em', margin: '0 0 10px' }}>Per-Domain Decks</h3>
+      <h3 style={{ fontSize: 13, fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', margin: '0 0 10px' }}>Per-Domain Decks</h3>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 8 }}>
         {domainDecks.filter(d => d.count > 0).map(d => (
           <button key={d.id} onClick={() => startDeck(d.id)}
-            style={{ textAlign: 'left', padding: '12px', borderRadius: 10, border: '1px solid #e2e8f0', background: '#fff', cursor: 'pointer', fontFamily: 'inherit' }}>
+            style={{ textAlign: 'left', padding: '12px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--surface)', cursor: 'pointer', fontFamily: 'inherit' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
               <span style={{ fontSize: 14 }}>{d.icon}</span>
               <span style={{ fontSize: 12, fontWeight: 700, color: DOMAIN_COLORS[d.label] || '#1d4ed8', lineHeight: 1.2 }}>{d.label}</span>
@@ -1415,16 +1427,16 @@ function SafmedsSessionScreen({ deckId, mode, timer, cards, cardIdx, revealed, c
         <button onClick={onQuit} style={{ background: 'rgba(255,255,255,0.18)', border: 'none', color: '#fff', padding: '6px 12px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>End</button>
       </div>
 
-      <div style={{ minHeight: 280, background: '#fff', border: `2px solid ${revealed ? '#86efac' : '#a78bfa'}`, borderRadius: 18, padding: '30px 26px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', marginBottom: 18, boxShadow: '0 6px 24px rgba(91,33,182,0.12)' }}>
+      <div style={{ minHeight: 280, background: 'var(--surface)', border: `2px solid ${revealed ? '#86efac' : '#a78bfa'}`, borderRadius: 18, padding: '30px 26px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', marginBottom: 18, boxShadow: '0 6px 24px rgba(91,33,182,0.12)' }}>
         <div style={{ fontSize: 11, fontWeight: 800, color: revealed ? '#16a34a' : '#5b21b6', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 14 }}>
           {revealed ? '✓ Term' : 'Definition'}
         </div>
         {!revealed ? (
-          <p style={{ fontSize: 18, lineHeight: 1.55, color: '#1e293b', margin: 0, textAlign: 'center', fontWeight: 500 }}>{card.def}</p>
+          <p style={{ fontSize: 18, lineHeight: 1.55, color: 'var(--text)', margin: 0, textAlign: 'center', fontWeight: 500 }}>{card.def}</p>
         ) : (
           <div style={{ textAlign: 'center' }}>
             <h3 style={{ fontSize: 30, fontWeight: 900, color: '#16a34a', margin: '0 0 14px', letterSpacing: '-0.02em' }}>{card.term}</h3>
-            <p style={{ fontSize: 13, lineHeight: 1.55, color: '#64748b', margin: 0, fontStyle: 'italic' }}>{card.def}</p>
+            <p style={{ fontSize: 13, lineHeight: 1.55, color: 'var(--text-muted)', margin: 0, fontStyle: 'italic' }}>{card.def}</p>
           </div>
         )}
       </div>
@@ -1452,7 +1464,7 @@ function SafmedsResultsScreen({ results, safmeds, onAgain, onPickAnother, onDone
     <div className="page" style={{ textAlign: 'center', padding: '2.5rem 1.25rem' }}>
       <div style={{ fontSize: '3rem', marginBottom: 8 }}>{isPB ? '🏆' : '🎴'}</div>
       <h2 style={{ fontWeight: 700, fontSize: '1.4rem', color: '#5b21b6', margin: '0 0 4px' }}>{isPB ? 'New Personal Best!' : 'Session Complete'}</h2>
-      <p style={{ fontSize: 13, color: '#64748b', margin: '0 0 1.25rem' }}>{deckLabel} · {mode === 'timed' ? `${timer}s sprint` : 'practice'}</p>
+      <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: '0 0 1.25rem' }}>{deckLabel} · {mode === 'timed' ? `${timer}s sprint` : 'practice'}</p>
       {mode === 'timed' && (
         <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginBottom: 14, fontSize: 32 }}>
           {[1, 2, 3].map(i => (<span key={i} style={{ filter: i <= stars ? 'none' : 'grayscale(1) opacity(0.3)' }}>⭐</span>))}
@@ -1547,7 +1559,7 @@ function WeakSpotReviewScreen({ queue, idx, answers, onAnswer, onNext, onQuit, s
             <button key={i} onClick={() => !showFeedback && onAnswer(i)} disabled={showFeedback}
               style={{
                 textAlign: 'left', padding: '11px 14px', borderRadius: 10, border: `2px solid ${border}`,
-                background: bg, fontSize: 14, color: '#1e293b', cursor: showFeedback ? 'default' : 'pointer',
+                background: bg, fontSize: 14, color: 'var(--text)', cursor: showFeedback ? 'default' : 'pointer',
                 fontFamily: 'inherit', display: 'flex', alignItems: 'flex-start', gap: 10,
               }}>
               <span style={{ fontWeight: 700, flexShrink: 0, color: labelColor, minWidth: 16 }}>{String.fromCharCode(65 + i)}.</span>
@@ -1567,7 +1579,7 @@ function WeakSpotReviewScreen({ queue, idx, answers, onAnswer, onNext, onQuit, s
           }}>
             {isCorrect ? `✓ Right! ${(item.consecutiveCorrect || 0) + 1 >= 2 ? 'Graduated 🎓' : 'One more in a row to graduate'}` : '✗ Stays in queue — try again next time'}
           </div>
-          <div className="card" style={{ padding: '1rem 1.25rem', marginBottom: '1rem', background: '#f8fafc' }}>
+          <div className="card" style={{ padding: '1rem 1.25rem', marginBottom: '1rem', background: 'var(--surface-alt)' }}>
             <div style={{ fontSize: 10, fontWeight: 800, color: '#1d4ed8', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 6 }}>📘 Rationale</div>
             <p style={{ fontSize: '.88rem', lineHeight: 1.7, margin: 0 }}>{q.rationale}</p>
           </div>
@@ -1587,7 +1599,7 @@ function WeakSpotSummaryScreen({ queue, answers, startCount, remaining, onContin
     <div className="page" style={{ textAlign: 'center', padding: '3rem 1.25rem' }}>
       <div style={{ fontSize: '3rem', marginBottom: '.5rem' }}>🎯</div>
       <h2 style={{ fontWeight: 800, fontSize: '1.4rem', marginBottom: '.25rem' }}>Review Complete</h2>
-      <p style={{ color: '#64748b', marginBottom: '1.5rem' }}>You worked through {queue.length} weak-spot question{queue.length === 1 ? '' : 's'}</p>
+      <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem' }}>You worked through {queue.length} weak-spot question{queue.length === 1 ? '' : 's'}</p>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: '1.5rem' }}>
         <div style={{ padding: '14px 8px', borderRadius: 12, background: '#dcfce7', border: '1px solid #86efac' }}>
           <div style={{ fontSize: 24, fontWeight: 900, color: '#16a34a' }}>{correctCount}</div>
@@ -1626,7 +1638,7 @@ function DomainQuizScreen({ domainName, questions, answers, currentIdx, onAnswer
       <button className="btn btn-ghost btn-sm" onClick={onBack} style={{ marginBottom: '.75rem' }}>← Back to Study Plan</button>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', gap: 8, flexWrap: 'wrap' }}>
         <h2 style={{ fontSize: '1.15rem', fontWeight: 700 }}>{DOMAIN_ICONS[domainName]} {domainName} · Spot-Check</h2>
-        <span style={{ fontSize: '.85rem', color: '#64748b' }}>{answered}/{total} answered</span>
+        <span style={{ fontSize: '.85rem', color: 'var(--text-muted)' }}>{answered}/{total} answered</span>
       </div>
       <div className="progress-bar" style={{ marginBottom: '1.5rem' }}>
         <div className="progress-fill" style={{ width: `${((currentIdx + 1) / total) * 100}%`, background: color }} />
@@ -1689,7 +1701,7 @@ function DomainQuizResultsScreen({ domainName, questions, answers, onReview, onT
     <div className="page" style={{ textAlign: 'center', padding: '2.5rem 1.25rem' }}>
       <div style={{ fontSize: '3rem', marginBottom: '.5rem' }}>{DOMAIN_ICONS[domainName]}</div>
       <h2 style={{ fontWeight: 800, fontSize: '1.4rem', marginBottom: '.25rem' }}>Spot-Check Complete</h2>
-      <p style={{ color: '#64748b', marginBottom: '1.5rem' }}>{domainName}</p>
+      <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem' }}>{domainName}</p>
       <div className="card" style={{
         padding: '1.75rem', marginBottom: '1.5rem', textAlign: 'center',
         borderTop: `4px solid ${passed ? '#16a34a' : '#dc2626'}`,
@@ -1759,7 +1771,7 @@ function ExamReviewScreen({ examQuestions, examAnswers, onBack }) {
 
       <div style={{ marginBottom: '1rem' }}>
         <select value={domainFilter} onChange={e => setDomainFilter(e.target.value)}
-          style={{ padding: '7px 12px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13, background: '#fff', color: '#1e293b', fontFamily: 'inherit', width: '100%', maxWidth: 360 }}>
+          style={{ padding: '7px 12px', borderRadius: 8, border: '1px solid var(--border)', fontSize: 13, background: 'var(--surface)', color: 'var(--text)', fontFamily: 'inherit', width: '100%', maxWidth: 360 }}>
           <option value="">All domains</option>
           {allDomains.map(d => <option key={d} value={d}>{DOMAIN_ICONS[d] || ''} {d}</option>)}
         </select>
@@ -1767,7 +1779,7 @@ function ExamReviewScreen({ examQuestions, examAnswers, onBack }) {
 
       {filtered.length === 0 ? (
         <div className="card" style={{ padding: '2rem', textAlign: 'center' }}>
-          <p style={{ color: '#64748b', margin: 0 }}>No questions match the current filters.</p>
+          <p style={{ color: 'var(--text-muted)', margin: 0 }}>No questions match the current filters.</p>
         </div>
       ) : (
         <>
@@ -1801,7 +1813,7 @@ function ExamReviewScreen({ examQuestions, examAnswers, onBack }) {
               return (
                 <div key={i} style={{
                   padding: '11px 14px', borderRadius: 10, border: `2px solid ${border}`, background: bg,
-                  fontSize: 14, color: '#1e293b', display: 'flex', alignItems: 'flex-start', gap: 10,
+                  fontSize: 14, color: 'var(--text)', display: 'flex', alignItems: 'flex-start', gap: 10,
                 }}>
                   <span style={{ fontWeight: 700, flexShrink: 0, color: labelColor, minWidth: 16 }}>{String.fromCharCode(65 + i)}.</span>
                   <span style={{ flex: 1, lineHeight: 1.55 }}>{opt}</span>
@@ -1813,7 +1825,7 @@ function ExamReviewScreen({ examQuestions, examAnswers, onBack }) {
             })}
           </div>
 
-          <div className="card" style={{ padding: '1.1rem 1.25rem', marginBottom: '1rem', background: '#f8fafc' }}>
+          <div className="card" style={{ padding: '1.1rem 1.25rem', marginBottom: '1rem', background: 'var(--surface-alt)' }}>
             <div style={{ fontSize: 10, fontWeight: 800, color: '#1d4ed8', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 6 }}>📘 Rationale</div>
             <p style={{ fontSize: '.88rem', lineHeight: 1.7, margin: 0 }}>{q.rationale}</p>
           </div>
@@ -1858,7 +1870,7 @@ function FinalResultsScreen({ examQuestions, examAnswers, examDomainScores, pret
   return (
     <div className="page">
       <h2 style={{ fontSize: '1.5rem', fontWeight: 800, marginBottom: '.5rem' }}>Final Results</h2>
-      <p style={{ color: '#64748b', marginBottom: '1.5rem' }}>Full Practice Exam · 85 Questions (75 scored + 10 pilot)</p>
+      <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem' }}>Full Practice Exam · 85 Questions (75 scored + 10 pilot)</p>
 
       <div className="card" style={{
         padding: '2rem', marginBottom: '1.5rem', textAlign: 'center',
@@ -1868,7 +1880,7 @@ function FinalResultsScreen({ examQuestions, examAnswers, examDomainScores, pret
         <p style={{ fontSize: '1.1rem', fontWeight: 700, color: passed ? '#16a34a' : '#dc2626', marginTop: '.3rem' }}>
           {passed ? '✓ PASSED' : '✗ NOT PASSED'}
         </p>
-        <p style={{ color: '#64748b', marginTop: '.3rem' }}>{correct} / {total} correct · Need ~70% to pass</p>
+        <p style={{ color: 'var(--text-muted)', marginTop: '.3rem' }}>{correct} / {total} correct · Need ~70% to pass</p>
       </div>
 
       <div className="card" style={{ padding: '1.75rem', marginBottom: '1.5rem' }}>
@@ -1903,7 +1915,7 @@ function FinalResultsScreen({ examQuestions, examAnswers, examDomainScores, pret
                   </div>
                 </div>
                 {d.total > 0 && (
-                  <div style={{ position: 'relative', height: 8, background: '#f1f5f9', borderRadius: 99, overflow: 'hidden' }}>
+                  <div style={{ position: 'relative', height: 8, background: 'var(--surface-alt)', borderRadius: 99, overflow: 'hidden' }}>
                     {pre && pre.pct !== null && (
                       <div style={{ position: 'absolute', height: '100%', width: `${pre.pct}%`, background: '#cbd5e1', borderRadius: 99 }} />
                     )}
@@ -1936,6 +1948,12 @@ export default function App() {
   useEffect(() => {
     savePersisted(state)
   }, [state])
+
+  // Reflect theme on <html> so CSS vars switch
+  useEffect(() => {
+    document.documentElement.dataset.theme = state.theme || 'light'
+  }, [state.theme])
+
   const timerRef = useRef(null)
   const sfxTimerRef = useRef(null)
 
@@ -2186,6 +2204,8 @@ export default function App() {
         weakDomains={state.weakDomains}
         onNav={handleNav}
         onReset={reset}
+        theme={state.theme}
+        onToggleTheme={() => setState(s => ({ ...s, theme: s.theme === 'dark' ? 'light' : 'dark' }))}
       />
 
       {phase === 'welcome' && (
