@@ -3,6 +3,7 @@ import { PRETEST_QUESTIONS } from './data/pretest.js'
 import { MODULES } from './data/modules.js'
 import { QUESTION_BANK } from './data/questions.js'
 import { MODULE_ENHANCEMENTS } from './data/moduleEnhancements.js'
+import { SAFMEDS_DECKS } from './data/safmedsDecks.js'
 
 // ─── localStorage persistence ─────────────────────────────────────────────────
 const STORAGE_KEY = 'rbt-exam-prep-v1'
@@ -39,6 +40,48 @@ function formatDuration(minutes) {
   return m ? `${h}h ${m}m` : `${h}h`
 }
 const bumpStat = (stats, key, by=1) => ({ ...(stats||{}), [key]: (stats?.[key]||0) + by })
+
+// ─── SAFMEDS helpers ──────────────────────────────────────────────────────────
+const SAFMEDS_LEVELS = [
+  { id:'beginner',     label:'Beginner',     icon:'🌱', unlock:0,   color:'#16a34a' },
+  { id:'intermediate', label:'Intermediate', icon:'⭐', unlock:50,  color:'#2563eb' },
+  { id:'advanced',     label:'Advanced',     icon:'🔥', unlock:200, color:'#dc2626' },
+  { id:'master',       label:'Master',       icon:'🏆', unlock:500, color:'#7c3aed' },
+]
+const SAFMEDS_TIMERS = [30, 60, 90, 120]
+
+function getSafmedsCards(deckId) {
+  if (deckId === 'all') {
+    return [...(SAFMEDS_DECKS.beginner||[]), ...(SAFMEDS_DECKS.intermediate||[]), ...(SAFMEDS_DECKS.advanced||[]), ...(SAFMEDS_DECKS.master||[])]
+  }
+  if (SAFMEDS_DECKS[deckId]) return SAFMEDS_DECKS[deckId]
+  if (deckId.startsWith('domain:')) {
+    const domain = deckId.slice(7)
+    const enh = MODULE_ENHANCEMENTS[domain] || []
+    return enh.flatMap(c => (c?.keyTerms || []).map(kt => ({term: kt.term, def: kt.def})))
+  }
+  return []
+}
+
+function shuffleCards(arr) { return [...arr].sort(()=>Math.random()-0.5) }
+
+function safmedsRate(correct, secondsElapsed) {
+  if (!secondsElapsed) return 0
+  return Math.round((correct / secondsElapsed) * 60 * 10) / 10
+}
+
+function safmedsStars(correct, timer) {
+  const rate = (correct / timer) * 60
+  if (rate >= 25) return 3
+  if (rate >= 15) return 2
+  if (rate >= 8) return 1
+  return 0
+}
+
+function isLevelUnlocked(levelId, totalTokens) {
+  const lvl = SAFMEDS_LEVELS.find(l => l.id === levelId)
+  return lvl && totalTokens >= lvl.unlock
+}
 
 // ─── weak spots (spaced-mastery review queue) ─────────────────────────────────
 const weakSpotId = q => q.id || `stem:${(q.stem||'').substring(0,80)}`
@@ -356,6 +399,10 @@ const INITIAL = {
   domainQuizDomain: null, domainQuizQuestions: [], domainQuizAnswers: {}, domainQuizCurrentIdx: 0,
   // weak spots
   weakSpots: {}, weakReviewQueue: [], weakReviewIdx: 0, weakReviewAnswers: {}, weakReviewStartCount: 0,
+  // SAFMEDS persistent
+  safmeds: { totalTokens:0, decks:{}, history:[], lastDeckId:'beginner', lastTimer:60, lastMode:'timed' },
+  // SAFMEDS transient session
+  sfxDeckId:null, sfxMode:'timed', sfxTimer:60, sfxCards:[], sfxCardIdx:0, sfxRevealed:false, sfxCorrect:0, sfxMissed:0, sfxRemaining:60, sfxResults:null,
   // study stats
   stats: { daysStudied:[], todayDate:'', todayMinutes:0, totalMinutes:0, modulesPassed:0, pretestsCompleted:0, examAttempts:0 },
 }
@@ -406,6 +453,7 @@ function NavBar({ phase, pretestSubmitted, skippedPretest, moduleStatus, weakDom
     { id: 'pretest', label: 'Pretest', icon: '📝', unlock: true },
     { id: 'pretest_results', label: 'Results', icon: '📊', unlock: pretestSubmitted },
     { id: 'modules', label: 'Study', icon: '📚', unlock: studyStarted && weakDomains.length > 0 },
+    { id: 'safmeds', label: 'SAFMEDS', icon: '🎴', always: true },
     { id: 'exam_intro', label: 'Exam', icon: '🏁', unlock: examUnlocked },
   ]
 
@@ -422,7 +470,7 @@ function NavBar({ phase, pretestSubmitted, skippedPretest, moduleStatus, weakDom
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '.25rem', flexWrap: 'wrap' }}>
           {navItems.map(item => {
-            const active = phase === item.id || (item.id === 'modules' && phase === 'module')
+            const active = phase === item.id || (item.id === 'modules' && phase === 'module') || (item.id === 'safmeds' && (phase === 'safmeds_session' || phase === 'safmeds_results'))
             const locked = !item.always && !item.unlock
             return (
               <button
@@ -459,7 +507,7 @@ function NavBar({ phase, pretestSubmitted, skippedPretest, moduleStatus, weakDom
 }
 
 // ─── WelcomeScreen ────────────────────────────────────────────────────────────
-function WelcomeScreen({ onBegin, onSkip, stats, weakSpotsCount, onReviewWeakSpots }) {
+function WelcomeScreen({ onBegin, onSkip, stats, weakSpotsCount, onReviewWeakSpots, safmeds, onOpenSafmeds }) {
   return (
     <div className="page">
       <div style={{ textAlign: 'center', padding: '2.5rem 0 2rem' }}>
@@ -474,6 +522,7 @@ function WelcomeScreen({ onBegin, onSkip, stats, weakSpotsCount, onReviewWeakSpo
 
       <StatsCard stats={stats}/>
       <WeakSpotsCard count={weakSpotsCount} onReview={onReviewWeakSpots}/>
+      <SafmedsCard safmeds={safmeds} onOpen={onOpenSafmeds}/>
 
       <div className="card" style={{ padding: '1.75rem', marginBottom: '1.5rem' }}>
         <h2 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '1rem', color: '#1e293b' }}>
@@ -1182,6 +1231,250 @@ function ExamScreen({ questions, answers, flagged, timeLeft, onAnswer, onFlag, o
   )
 }
 
+// ─── SAFMEDS UI components ────────────────────────────────────────────────────
+function SelfGraph({ history }) {
+  const recent = (history || []).slice(-15)
+  if (recent.length < 2) {
+    return <div style={{ textAlign: 'center', padding: '14px 12px', fontSize: 12, color: '#94a3b8', fontStyle: 'italic' }}>📊 Run at least 2 timed sessions to see your fluency curve.</div>
+  }
+  const W = 300, H = 110, padL = 22, padB = 18, padT = 10
+  const rates = recent.map(r => r.rate || 0)
+  const maxRate = Math.max(...rates, 10)
+  const pts = rates.map((r, i) => {
+    const x = padL + (i / (rates.length - 1)) * (W - padL - 8)
+    const y = padT + (1 - r / maxRate) * (H - padT - padB)
+    return [x, y]
+  })
+  return (
+    <div>
+      <div style={{ fontSize: 11, fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 6 }}>📊 Your Fluency (last {recent.length} sessions)</div>
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', display: 'block' }}>
+        <line x1={padL} y1={padT} x2={padL} y2={H - padB} stroke="#e2e8f0" strokeWidth={1} />
+        <line x1={padL} y1={H - padB} x2={W - 4} y2={H - padB} stroke="#e2e8f0" strokeWidth={1} />
+        <text x={padL - 3} y={padT + 4} textAnchor="end" fontSize={8} fill="#94a3b8">{Math.ceil(maxRate)}/min</text>
+        <text x={padL - 3} y={H - padB + 2} textAnchor="end" fontSize={8} fill="#94a3b8">0</text>
+        <polyline points={pts.map(p => p.join(',')).join(' ')} fill="none" stroke="#5b21b6" strokeWidth={2} />
+        {pts.map(([x, y], i) => (<circle key={i} cx={x} cy={y} r={3} fill="#5b21b6" />))}
+        <text x={W / 2} y={H - 3} textAnchor="middle" fontSize={8} fill="#94a3b8">→ correct/min over time</text>
+      </svg>
+    </div>
+  )
+}
+
+function SafmedsCard({ safmeds, onOpen }) {
+  const tokens = safmeds?.totalTokens || 0
+  const bestBeginner = safmeds?.decks?.beginner?.high60s || 0
+  return (
+    <div style={{
+      marginBottom: '1.25rem',
+      background: 'linear-gradient(135deg, #ede9fe 0%, #c4b5fd 100%)',
+      border: '1px solid #a78bfa', borderRadius: 14, padding: '1rem 1.1rem',
+      display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap',
+    }}>
+      <div>
+        <h3 style={{ fontSize: 14, fontWeight: 800, color: '#5b21b6', margin: '0 0 4px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>🎴 SAFMEDS Fluency Drill</h3>
+        <p style={{ fontSize: 13, color: '#5b21b6', margin: 0, opacity: 0.85 }}>
+          🪙 <strong>{tokens}</strong> tokens · Best (Beginner 60s): <strong>{bestBeginner}</strong>
+        </p>
+      </div>
+      <button onClick={onOpen} style={{ padding: '10px 18px', background: '#5b21b6', color: '#fff', border: 'none', borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit' }}>Drill →</button>
+    </div>
+  )
+}
+
+function SafmedsHubScreen({ safmeds, onStart, onBack }) {
+  const tokens = safmeds?.totalTokens || 0
+  const [mode, setMode] = useState(safmeds?.lastMode || 'timed')
+  const [timer, setTimer] = useState(safmeds?.lastTimer || 60)
+
+  const domainDecks = Object.keys(MODULE_ENHANCEMENTS).map(d => ({
+    id: `domain:${d}`, label: d, icon: DOMAIN_ICONS[d] || '📚',
+    count: getSafmedsCards(`domain:${d}`).length,
+  }))
+
+  const startDeck = (deckId) => onStart({ deckId, mode, timer })
+
+  return (
+    <div className="page">
+      <button className="btn btn-ghost btn-sm" onClick={onBack} style={{ marginBottom: '.75rem' }}>← Back</button>
+      <h2 style={{ fontSize: '1.4rem', fontWeight: 700, color: '#5b21b6', marginBottom: '.25rem' }}>🎴 SAFMEDS Fluency Drill</h2>
+      <p style={{ color: '#64748b', marginBottom: '1.25rem', fontSize: '.9rem' }}>Say All Fast Minute Each Day Shuffled · See definition → recall term → self-grade</p>
+
+      <div style={{ background: 'linear-gradient(135deg, #ede9fe 0%, #f5f3ff 100%)', border: '1px solid #c4b5fd', borderRadius: 14, padding: '14px 18px', marginBottom: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 800, color: '#5b21b6', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Token Balance</div>
+          <div style={{ fontSize: 24, fontWeight: 900, color: '#5b21b6' }}>🪙 {tokens}</div>
+        </div>
+        <div style={{ flex: 1, minWidth: 200 }}>
+          <SelfGraph history={safmeds?.history} />
+        </div>
+      </div>
+
+      <div className="card" style={{ padding: 14, marginBottom: '1.25rem' }}>
+        <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
+          {['timed', 'practice'].map(m => (
+            <button key={m} onClick={() => setMode(m)}
+              style={{ padding: '7px 14px', borderRadius: 99, border: `1.5px solid ${mode === m ? '#5b21b6' : '#e2e8f0'}`, background: mode === m ? '#5b21b6' : '#fff', color: mode === m ? '#fff' : '#5b21b6', cursor: 'pointer', fontSize: 12, fontWeight: 700, fontFamily: 'inherit' }}>
+              {m === 'timed' ? '⏱ Timed Sprint' : '🐢 Untimed Practice'}
+            </button>
+          ))}
+        </div>
+        {mode === 'timed' && (
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+            <span style={{ fontSize: 12, color: '#64748b', marginRight: 4 }}>Timer:</span>
+            {SAFMEDS_TIMERS.map(t => (
+              <button key={t} onClick={() => setTimer(t)}
+                style={{ padding: '5px 12px', borderRadius: 8, border: `1px solid ${timer === t ? '#5b21b6' : '#e2e8f0'}`, background: timer === t ? '#ede9fe' : '#fff', color: timer === t ? '#5b21b6' : '#1e293b', cursor: 'pointer', fontSize: 12, fontWeight: 600, fontFamily: 'inherit' }}>
+                {t}s
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <h3 style={{ fontSize: 13, fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.07em', margin: '0 0 10px' }}>Difficulty Levels</h3>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10, marginBottom: '1.5rem' }}>
+        {SAFMEDS_LEVELS.map(lvl => {
+          const unlocked = isLevelUnlocked(lvl.id, tokens)
+          const cards = getSafmedsCards(lvl.id)
+          const stats = safmeds?.decks?.[lvl.id] || {}
+          return (
+            <button key={lvl.id} onClick={() => unlocked && cards.length > 0 && startDeck(lvl.id)} disabled={!unlocked || cards.length === 0}
+              style={{ textAlign: 'left', padding: '14px', borderRadius: 12, border: `2px solid ${unlocked ? lvl.color : '#e2e8f0'}`, background: unlocked ? '#fff' : '#f1f5f9', cursor: unlocked && cards.length > 0 ? 'pointer' : 'default', opacity: unlocked ? 1 : 0.6, fontFamily: 'inherit' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                <span style={{ fontSize: 18 }}>{unlocked ? lvl.icon : '🔒'}</span>
+                <span style={{ fontSize: 14, fontWeight: 800, color: unlocked ? lvl.color : '#64748b' }}>{lvl.label}</span>
+              </div>
+              <div style={{ fontSize: 11, color: '#64748b' }}>{cards.length} cards{cards.length === 0 ? ' (loading…)' : ''}</div>
+              {!unlocked && <div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>🪙 {lvl.unlock} tokens to unlock</div>}
+              {unlocked && stats.high60s > 0 && <div style={{ fontSize: 11, color: lvl.color, marginTop: 4 }}>Best 60s: <strong>{stats.high60s}</strong></div>}
+            </button>
+          )
+        })}
+      </div>
+
+      <h3 style={{ fontSize: 13, fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.07em', margin: '0 0 10px' }}>Mega Deck</h3>
+      <button onClick={() => startDeck('all')}
+        style={{ width: '100%', textAlign: 'left', padding: '14px 16px', borderRadius: 12, border: '2px solid #b45309', background: '#fef3c7', marginBottom: '1.5rem', cursor: 'pointer', fontFamily: 'inherit' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+          <span style={{ fontSize: 18 }}>🎯</span>
+          <span style={{ fontSize: 14, fontWeight: 800, color: '#b45309' }}>All Terms</span>
+        </div>
+        <div style={{ fontSize: 11, color: '#b45309', opacity: 0.8 }}>{getSafmedsCards('all').length} cards · every level mixed</div>
+      </button>
+
+      <h3 style={{ fontSize: 13, fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.07em', margin: '0 0 10px' }}>Per-Domain Decks</h3>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 8 }}>
+        {domainDecks.filter(d => d.count > 0).map(d => (
+          <button key={d.id} onClick={() => startDeck(d.id)}
+            style={{ textAlign: 'left', padding: '12px', borderRadius: 10, border: '1px solid #e2e8f0', background: '#fff', cursor: 'pointer', fontFamily: 'inherit' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+              <span style={{ fontSize: 14 }}>{d.icon}</span>
+              <span style={{ fontSize: 12, fontWeight: 700, color: DOMAIN_COLORS[d.label] || '#1d4ed8', lineHeight: 1.2 }}>{d.label}</span>
+            </div>
+            <div style={{ fontSize: 10, color: '#94a3b8' }}>{d.count} cards</div>
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function SafmedsSessionScreen({ deckId, mode, timer, cards, cardIdx, revealed, correct, missed, remaining, onReveal, onGrade, onQuit }) {
+  const card = cards[cardIdx % cards.length]
+  if (!card) return <div className="page"><p>No cards available.</p></div>
+  const isTimed = mode === 'timed'
+  const timerColor = remaining <= 10 ? '#dc2626' : remaining <= 30 ? '#f59e0b' : '#fff'
+  const total = correct + missed
+  const rate = isTimed && (timer - remaining) > 0 ? safmedsRate(correct, timer - remaining) : 0
+  return (
+    <div className="page" style={{ padding: '1rem' }}>
+      <div style={{ background: '#5b21b6', borderRadius: 12, padding: '10px 16px', marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, color: '#fff' }}>
+        <div>
+          <div style={{ fontSize: 11, opacity: 0.8, textTransform: 'uppercase', letterSpacing: '0.07em' }}>SAFMEDS · {mode}</div>
+          <div style={{ fontSize: 13, fontWeight: 700 }}>✓ {correct}  ·  ✗ {missed}{rate > 0 && ` · ${rate}/min`}</div>
+        </div>
+        {isTimed ? (
+          <div style={{ fontSize: 24, fontWeight: 900, color: timerColor, fontVariantNumeric: 'tabular-nums' }}>
+            {Math.floor(remaining / 60)}:{String(remaining % 60).padStart(2, '0')}
+          </div>
+        ) : (
+          <div style={{ fontSize: 13, opacity: 0.85 }}>Card {total + 1}</div>
+        )}
+        <button onClick={onQuit} style={{ background: 'rgba(255,255,255,0.18)', border: 'none', color: '#fff', padding: '6px 12px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>End</button>
+      </div>
+
+      <div style={{ minHeight: 280, background: '#fff', border: `2px solid ${revealed ? '#86efac' : '#a78bfa'}`, borderRadius: 18, padding: '30px 26px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', marginBottom: 18, boxShadow: '0 6px 24px rgba(91,33,182,0.12)' }}>
+        <div style={{ fontSize: 11, fontWeight: 800, color: revealed ? '#16a34a' : '#5b21b6', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 14 }}>
+          {revealed ? '✓ Term' : 'Definition'}
+        </div>
+        {!revealed ? (
+          <p style={{ fontSize: 18, lineHeight: 1.55, color: '#1e293b', margin: 0, textAlign: 'center', fontWeight: 500 }}>{card.def}</p>
+        ) : (
+          <div style={{ textAlign: 'center' }}>
+            <h3 style={{ fontSize: 30, fontWeight: 900, color: '#16a34a', margin: '0 0 14px', letterSpacing: '-0.02em' }}>{card.term}</h3>
+            <p style={{ fontSize: 13, lineHeight: 1.55, color: '#64748b', margin: 0, fontStyle: 'italic' }}>{card.def}</p>
+          </div>
+        )}
+      </div>
+
+      {!revealed ? (
+        <button onClick={onReveal} style={{ width: '100%', padding: '16px', background: '#5b21b6', color: '#fff', border: 'none', borderRadius: 12, fontSize: 16, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+          Reveal Term →
+        </button>
+      ) : (
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button onClick={() => onGrade(false)} style={{ flex: 1, padding: '15px', background: '#fee2e2', color: '#dc2626', border: '2px solid #fca5a5', borderRadius: 12, fontSize: 15, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>✗ Missed</button>
+          <button onClick={() => onGrade(true)} style={{ flex: 1, padding: '15px', background: '#dcfce7', color: '#16a34a', border: '2px solid #86efac', borderRadius: 12, fontSize: 15, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>✓ Got It</button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function SafmedsResultsScreen({ results, safmeds, onAgain, onPickAnother, onDone }) {
+  if (!results) return null
+  const { correct, missed, mode, timer, deckLabel, isPB, tokensEarned, prevHigh } = results
+  const rate = mode === 'timed' ? Math.round((correct / timer) * 60 * 10) / 10 : 0
+  const stars = mode === 'timed' ? safmedsStars(correct, timer) : 0
+  return (
+    <div className="page" style={{ textAlign: 'center', padding: '2.5rem 1.25rem' }}>
+      <div style={{ fontSize: '3rem', marginBottom: 8 }}>{isPB ? '🏆' : '🎴'}</div>
+      <h2 style={{ fontWeight: 700, fontSize: '1.4rem', color: '#5b21b6', margin: '0 0 4px' }}>{isPB ? 'New Personal Best!' : 'Session Complete'}</h2>
+      <p style={{ fontSize: 13, color: '#64748b', margin: '0 0 1.25rem' }}>{deckLabel} · {mode === 'timed' ? `${timer}s sprint` : 'practice'}</p>
+      {mode === 'timed' && (
+        <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginBottom: 14, fontSize: 32 }}>
+          {[1, 2, 3].map(i => (<span key={i} style={{ filter: i <= stars ? 'none' : 'grayscale(1) opacity(0.3)' }}>⭐</span>))}
+        </div>
+      )}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: '1.25rem' }}>
+        <div style={{ padding: '14px 8px', borderRadius: 12, background: '#dcfce7', border: '1px solid #86efac' }}>
+          <div style={{ fontSize: 24, fontWeight: 900, color: '#16a34a' }}>{correct}</div>
+          <div style={{ fontSize: 11, color: '#16a34a', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Correct</div>
+        </div>
+        <div style={{ padding: '14px 8px', borderRadius: 12, background: '#fee2e2', border: '1px solid #fca5a5' }}>
+          <div style={{ fontSize: 24, fontWeight: 900, color: '#dc2626' }}>{missed}</div>
+          <div style={{ fontSize: 11, color: '#dc2626', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Missed</div>
+        </div>
+        <div style={{ padding: '14px 8px', borderRadius: 12, background: '#ede9fe', border: '1px solid #a78bfa' }}>
+          <div style={{ fontSize: 24, fontWeight: 900, color: '#5b21b6' }}>{mode === 'timed' ? rate : correct + missed}</div>
+          <div style={{ fontSize: 11, color: '#5b21b6', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{mode === 'timed' ? 'Per Minute' : 'Total'}</div>
+        </div>
+      </div>
+      <div style={{ padding: 14, borderRadius: 12, background: '#fef3c7', border: '1px solid #fcd34d', marginBottom: '1.25rem' }}>
+        <div style={{ fontSize: 14, color: '#b45309', fontWeight: 700 }}>🪙 +{tokensEarned} tokens earned</div>
+        {isPB && prevHigh !== undefined && <div style={{ fontSize: 12, color: '#b45309', marginTop: 4 }}>Beat previous best of {prevHigh} (+5 PB bonus)</div>}
+        <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 6 }}>Total balance: 🪙 {safmeds?.totalTokens || 0}</div>
+      </div>
+      <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
+        <button className="btn btn-primary" style={{ background: '#5b21b6', borderColor: '#5b21b6' }} onClick={onAgain}>↻ Run It Back</button>
+        <button className="btn btn-secondary" style={{ borderColor: '#5b21b6', color: '#5b21b6' }} onClick={onPickAnother}>📚 Pick Different Deck</button>
+        <button className="btn btn-ghost" onClick={onDone}>← Home</button>
+      </div>
+    </div>
+  )
+}
+
 // ─── WeakSpotsCard ────────────────────────────────────────────────────────────
 function WeakSpotsCard({ count, onReview }) {
   if (!count) return null
@@ -1633,6 +1926,52 @@ export default function App() {
     savePersisted(state)
   }, [state])
   const timerRef = useRef(null)
+  const sfxTimerRef = useRef(null)
+
+  // SAFMEDS session finalize — compute results, update tokens/decks/history
+  const finishSafmedsSession = () => {
+    clearInterval(sfxTimerRef.current)
+    setState(p => {
+      const deckId = p.sfxDeckId
+      const isTimed = p.sfxMode === 'timed'
+      const correct = p.sfxCorrect, missed = p.sfxMissed, timer = p.sfxTimer
+      const sf = p.safmeds || { totalTokens:0, decks:{}, history:[] }
+      const deckStats = sf.decks[deckId] || {}
+      const highKey = `high${timer}s`
+      const prevHigh = deckStats[highKey] || 0
+      const isPB = isTimed && correct > prevHigh
+      const tokensEarned = correct + (isPB ? 5 : 0)
+      const newSf = {
+        ...sf,
+        totalTokens: (sf.totalTokens||0) + tokensEarned,
+        decks: { ...sf.decks, [deckId]: { ...deckStats, attempts:(deckStats.attempts||0)+1, ...(isTimed && correct > prevHigh ? {[highKey]:correct} : {}) } },
+        history: [...(sf.history||[]), {
+          date: todayISO(), deck: deckId, mode: p.sfxMode, timer, correct, missed,
+          rate: isTimed ? Math.round((correct/timer)*60*10)/10 : 0,
+        }].slice(-100),
+        lastDeckId: deckId, lastTimer: timer, lastMode: p.sfxMode,
+      }
+      const deckLabel = SAFMEDS_LEVELS.find(l=>l.id===deckId)?.label || (deckId==='all'?'All Terms':deckId.startsWith('domain:')?deckId.slice(7):deckId)
+      return { ...p, phase:'safmeds_results', safmeds:newSf, sfxResults:{ correct, missed, mode:p.sfxMode, timer, deckId, deckLabel, isPB, tokensEarned, prevHigh } }
+    })
+  }
+
+  // SAFMEDS session timer (timed mode only)
+  useEffect(() => {
+    if (state.phase === 'safmeds_session' && state.sfxMode === 'timed' && state.sfxRemaining > 0) {
+      sfxTimerRef.current = setInterval(() => {
+        setState(p => {
+          if (p.sfxRemaining <= 1) {
+            clearInterval(sfxTimerRef.current)
+            setTimeout(() => finishSafmedsSession(), 0)
+            return { ...p, sfxRemaining: 0 }
+          }
+          return { ...p, sfxRemaining: p.sfxRemaining - 1 }
+        })
+      }, 1000)
+    }
+    return () => clearInterval(sfxTimerRef.current)
+  }, [state.phase, state.sfxMode])
 
   // Daily activity tracking + session heartbeat (counts 1 min per visible-tab minute)
   useEffect(() => {
@@ -1842,6 +2181,8 @@ export default function App() {
         <WelcomeScreen
           stats={state.stats}
           weakSpotsCount={Object.keys(state.weakSpots || {}).length}
+          safmeds={state.safmeds}
+          onOpenSafmeds={() => setState(s => ({ ...s, phase: 'safmeds' }))}
           onReviewWeakSpots={() => {
             const items = Object.values(state.weakSpots || {})
             const queue = [...items].sort(() => Math.random() - 0.5)
@@ -1953,6 +2294,50 @@ export default function App() {
             }
           }}
           onQuit={() => setState(s => ({ ...s, phase: 'welcome' }))}
+        />
+      )}
+
+      {phase === 'safmeds' && (
+        <SafmedsHubScreen
+          safmeds={state.safmeds}
+          onBack={() => setState(s => ({ ...s, phase: 'welcome' }))}
+          onStart={({ deckId, mode, timer }) => {
+            const cards = shuffleCards(getSafmedsCards(deckId))
+            if (cards.length === 0) return
+            setState(s => ({ ...s, phase: 'safmeds_session', sfxDeckId: deckId, sfxMode: mode, sfxTimer: timer, sfxCards: cards, sfxCardIdx: 0, sfxRevealed: false, sfxCorrect: 0, sfxMissed: 0, sfxRemaining: mode === 'timed' ? timer : 0, sfxResults: null }))
+          }}
+        />
+      )}
+
+      {phase === 'safmeds_session' && (
+        <SafmedsSessionScreen
+          deckId={state.sfxDeckId} mode={state.sfxMode} timer={state.sfxTimer}
+          cards={state.sfxCards} cardIdx={state.sfxCardIdx} revealed={state.sfxRevealed}
+          correct={state.sfxCorrect} missed={state.sfxMissed} remaining={state.sfxRemaining}
+          onReveal={() => setState(s => ({ ...s, sfxRevealed: true }))}
+          onGrade={(gotIt) => {
+            setState(p => ({
+              ...p,
+              sfxCorrect: p.sfxCorrect + (gotIt ? 1 : 0),
+              sfxMissed: p.sfxMissed + (gotIt ? 0 : 1),
+              sfxCardIdx: p.sfxCardIdx + 1,
+              sfxRevealed: false,
+              sfxCards: (p.sfxCardIdx + 1 >= p.sfxCards.length) ? shuffleCards(p.sfxCards) : p.sfxCards,
+            }))
+          }}
+          onQuit={finishSafmedsSession}
+        />
+      )}
+
+      {phase === 'safmeds_results' && (
+        <SafmedsResultsScreen
+          results={state.sfxResults} safmeds={state.safmeds}
+          onAgain={() => {
+            const cards = shuffleCards(getSafmedsCards(state.sfxDeckId))
+            setState(s => ({ ...s, phase: 'safmeds_session', sfxCards: cards, sfxCardIdx: 0, sfxRevealed: false, sfxCorrect: 0, sfxMissed: 0, sfxRemaining: state.sfxMode === 'timed' ? state.sfxTimer : 0, sfxResults: null }))
+          }}
+          onPickAnother={() => setState(s => ({ ...s, phase: 'safmeds' }))}
+          onDone={() => setState(s => ({ ...s, phase: 'welcome' }))}
         />
       )}
 
