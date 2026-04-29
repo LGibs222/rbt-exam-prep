@@ -530,89 +530,290 @@ function NavBar({ phase, pretestSubmitted, skippedPretest, moduleStatus, weakDom
 }
 
 // ─── WelcomeScreen ────────────────────────────────────────────────────────────
-function WelcomeScreen({ onBegin, onSkip, stats, weakSpotsCount, onReviewWeakSpots, safmeds, onOpenSafmeds }) {
+// "Citrine" Welcome — bold editorial cover. Surfaces the full prep
+// system: pretest, modules, mock, SAFMEDS, weak spots, plus pretest
+// snapshot, weekly calendar, and per-domain spot-check.
+function WelcomeScreen({
+  onBegin, onSkip, stats, weakSpotsCount, onReviewWeakSpots,
+  safmeds, onOpenSafmeds, onNav, onSpotCheck,
+  pretestDomainScores, moduleStatus, weakDomains, examScores, skippedPretest,
+}) {
+  // Domain question counts from the bank
+  const domainCounts = {}
+  DOMAIN_NAMES.forEach(d => {
+    const letter = LETTER_OF[d]
+    domainCounts[d] = QUESTION_BANK.filter(q => q.domain === letter).length
+  })
+  const bankTotal = QUESTION_BANK.length
+
+  // Streak + activity helpers
+  const streak = calculateStreak(stats?.daysStudied)
+  const modulesPassed = DOMAIN_NAMES.filter(d => moduleStatus?.[d] === 'passed').length
+  const passedAll = (weakDomains?.length || 0) > 0 && (weakDomains || []).every(d => moduleStatus?.[d] === 'passed')
+  const pretestDone = !!pretestDomainScores
+  const examTaken = !!examScores
+
+  // Smart "today's focus"
+  const focus = (() => {
+    if (!pretestDone && !skippedPretest) return { title: 'Start with the diagnostic', desc: 'Take the 30-question pretest to find your weak domains.', cta: 'Begin pretest', go: () => onBegin?.() }
+    if (!passedAll) {
+      const next = (weakDomains?.length ? weakDomains : DOMAIN_NAMES).find(d => moduleStatus?.[d] !== 'passed')
+      const letter = next ? LETTER_OF[next] : '?'
+      return { title: `Study Domain ${letter}: ${next || ''}`, desc: `Continue your prep. ${modulesPassed} of ${weakDomains?.length || DOMAIN_NAMES.length} modules passed.`, cta: 'Open module', go: () => onNav?.('modules') }
+    }
+    if (passedAll && !examTaken) return { title: 'Take the full mock exam', desc: 'All modules passed. The 85-question simulation is unlocked.', cta: 'Begin mock', go: () => onNav?.('exam_intro') }
+    return { title: 'Stay sharp with SAFMEDS', desc: 'Run a fluency drill to keep terminology fresh.', cta: 'Open SAFMEDS', go: () => onOpenSafmeds?.() }
+  })()
+
+  // Earned badges (simple computation — first 4 fill the strip)
+  const allBadges = [
+    { id:'first',     icon:'🌱', earned: (stats?.daysStudied?.length || 0) >= 1, label:'First Step' },
+    { id:'streak3',   icon:'🔥', earned: streak >= 3, label:'On a Roll' },
+    { id:'mod1',      icon:'📚', earned: modulesPassed >= 1, label:'Module Master' },
+    { id:'mod_half',  icon:'⭐', earned: modulesPassed >= 3, label:'Halfway' },
+    { id:'mod_all',   icon:'🎯', earned: passedAll, label:'All Domains' },
+    { id:'first_exam',icon:'🏁', earned: !!examTaken, label:'Test-Ready' },
+    { id:'fluency',   icon:'🎴', earned: (safmeds?.totalTokens || 0) >= 50, label:'Fluency' },
+    { id:'graduate',  icon:'🎓', earned: !!examTaken && passedAll, label:'Graduate' },
+  ]
+  const earned = allBadges.filter(b => b.earned)
+
+  // Last-7-day calendar (binary studied/not from daysStudied)
+  const today = new Date()
+  const studied = new Set(stats?.daysStudied || [])
+  const days = []
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(today.getTime() - i * 86400000)
+    const iso = d.toISOString().slice(0, 10)
+    const lbl = ['SUN','MON','TUE','WED','THU','FRI','SAT'][d.getDay()]
+    const isToday = i === 0
+    const wasStudied = studied.has(iso)
+    let mins = 0
+    if (isToday) mins = stats?.todayMinutes || 0
+    else if (wasStudied) mins = 30
+    days.push({ iso, lbl, isToday, wasStudied, mins })
+  }
+  const maxMins = Math.max(30, ...days.map(d => d.mins))
+  const totalMins = days.reduce((a,d)=>a+d.mins, 0)
+  const fmtMins = (m) => m === 0 ? '—' : m < 60 ? `${m}m` : `${Math.floor(m/60)}h ${m%60}m`
+
+  // Mode card configuration
+  const modes = [
+    { cls:'pretest', icon:'📝', name:'Pretest', meta:'30 Q · 6 DOMAINS',
+      desc: pretestDone ? 'Diagnostic complete. Review your weak domains.' : 'Diagnostic snapshot of your weak domains. Take it once before studying.',
+      cta: pretestDone ? 'Review results' : 'Begin pretest',
+      status: pretestDone ? { label:'DONE', cls:'done' } : { label:'START HERE', cls:'now' },
+      onClick: () => pretestDone ? onNav?.('pretest_results') : onBegin?.(),
+    },
+    { cls:'modules', icon:'📚', name:'Modules', meta:'6 DOMAINS · 5-Q QUIZZES',
+      desc:`Concept content + key-term cards. ${modulesPassed} of ${weakDomains?.length || DOMAIN_NAMES.length} passed.`,
+      cta: modulesPassed > 0 ? 'Continue studying' : 'Open modules',
+      status: passedAll ? { label:'DONE', cls:'done' } : (pretestDone || skippedPretest) ? { label:'NOW', cls:'now' } : { label:'AFTER PRETEST', cls:'locked' },
+      onClick: () => onNav?.('modules'),
+    },
+    { cls:'mock', icon:'🏁', name:'Mock Exam', meta:'85 Q · 90 MIN · 75 SCORED',
+      desc:'Full simulation with 10 hidden field-test items. Pass all modules first.',
+      cta: examTaken ? 'View results' : passedAll ? 'Begin mock' : 'Unlocks soon',
+      status: examTaken ? { label:'DONE', cls:'done' } : passedAll ? { label:'READY', cls:'now' } : { label:'LOCKED', cls:'locked' },
+      onClick: () => examTaken ? onNav?.('final_results') : passedAll ? onNav?.('exam_intro') : null,
+    },
+    { cls:'safmeds', icon:'🎴', name:'SAFMEDS', meta:'180 TERMS · 4 LEVELS',
+      desc:'Gamified fluency drill. Beat your per-minute rate. Earn tokens.',
+      cta:'Start drill',
+      status:{ label:'ANYTIME', cls:'' },
+      onClick: () => onOpenSafmeds?.(),
+    },
+  ]
+
   return (
-    <div className="page">
-      <div style={{ textAlign: 'center', padding: '2.5rem 0 2rem' }}>
-        <div style={{ fontSize: '3.5rem', marginBottom: '.75rem' }}>🧠</div>
-        <h1 style={{ fontSize: '2.2rem', fontWeight: 800, color: '#2c6e49', marginBottom: '.5rem' }}>
-          RBT Exam Prep
-        </h1>
-        <p style={{ fontSize: '1.1rem', color: 'var(--text-muted)', maxWidth: 480, margin: '0 auto 2rem' }}>
-          3rd Edition Task List · Adaptive Study System
-        </p>
+    <div className="page citrine">
+
+      <div className="issue-strip">
+        <div>RBT EXAM PREP <span style={{margin:'0 6px',color:'var(--citrine-saffron)'}}>·</span> 3RD EDITION TASK LIST</div>
+        <div className="right">VOL. IV / 2026</div>
       </div>
 
-      <StatsCard stats={stats}/>
-      <WeakSpotsCard count={weakSpotsCount} onReview={onReviewWeakSpots}/>
-      <SafmedsCard safmeds={safmeds} onOpen={onOpenSafmeds}/>
-
-      <div className="card" style={{ padding: '1.75rem', marginBottom: '1.5rem' }}>
-        <h2 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '1rem', color: 'var(--text)' }}>
-          How This Works
-        </h2>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: '1rem' }}>
-          {[
-            { step: '1', icon: '📝', title: 'Diagnostic Pretest', desc: '24 questions across all 6 domains' },
-            { step: '2', icon: '📊', title: 'Identify Weak Areas', desc: 'Domains below 70% get targeted review' },
-            { step: '3', icon: '📚', title: 'Study Modules', desc: 'Read concepts, then pass an 80% quiz' },
-            { step: '4', icon: '🏁', title: 'Full 85-Question Exam', desc: '75 scored + 10 pilot · 90 min · ~70% to pass' },
-          ].map(({ step, icon, title, desc }) => (
-            <div key={step} style={{
-              background: 'var(--surface-alt)', border: '1px solid var(--border)',
-              borderRadius: 10, padding: '1rem', textAlign: 'center',
-            }}>
-              <div style={{ fontSize: '2rem', marginBottom: '.5rem' }}>{icon}</div>
-              <div style={{
-                width: 24, height: 24, background: '#2c6e49', color: '#fff',
-                borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: '.75rem', fontWeight: 800, marginBottom: '.5rem',
-              }}>{step}</div>
-              <p style={{ fontWeight: 700, fontSize: '.9rem', marginBottom: '.25rem' }}>{title}</p>
-              <p style={{ fontSize: '.8rem', color: 'var(--text-muted)' }}>{desc}</p>
-            </div>
-          ))}
+      {/* HERO */}
+      <section className="hero fade-up fade-up-1">
+        <div className="hero-content">
+          <div className="hero-eyebrow">3rd Edition · Task List · BACB Aligned</div>
+          <h1 className="hero-title">Pass the test. <i>Earn the role.</i></h1>
+          <p className="hero-lede">
+            A complete RBT prep system. <b>Diagnostic pretest</b>, <b>six targeted modules</b>, <b>full 85-question mock</b>, and <b>SAFMEDS fluency drills</b>. Built around the BACB Task List.
+          </p>
+          <div className="hero-cta-row">
+            {!pretestDone && !skippedPretest && (
+              <button className="btn btn-primary" style={{padding:'12px 26px'}} onClick={onBegin}>Begin Pretest →</button>
+            )}
+            {(pretestDone || skippedPretest) && (
+              <button className="btn btn-primary" style={{padding:'12px 26px'}} onClick={() => onNav?.('modules')}>Open Modules →</button>
+            )}
+            <button className="btn btn-secondary" style={{padding:'12px 24px'}} onClick={() => onOpenSafmeds?.()}>📖 Study SAFMEDS</button>
+          </div>
+          <div className="hero-stats">
+            <div className="h-stat"><div className="num">85</div><div className="lbl">Per mock</div></div>
+            <div className="h-stat"><div className="num">75</div><div className="lbl">Scored</div></div>
+            <div className="h-stat"><div className="num">90m</div><div className="lbl">Time limit</div></div>
+            <div className="h-stat"><div className="num">{bankTotal}</div><div className="lbl">Bank size</div></div>
+          </div>
         </div>
+      </section>
+
+      {/* TODAY'S FOCUS */}
+      <div className="section-head"><h2>Today's <i>focus</i></h2><span className="meta">— Smart suggestion</span></div>
+      <div className="focus-card fade-up fade-up-2" onClick={focus.go}>
+        <div className="focus-icon">⚡</div>
+        <div className="focus-text">
+          <div className="focus-eyebrow">Resume where you left off</div>
+          <div className="focus-title">{focus.title}</div>
+          <div className="focus-desc">{focus.desc}</div>
+        </div>
+        <button className="focus-action" onClick={(e) => { e.stopPropagation(); focus.go?.() }}>{focus.cta} →</button>
       </div>
 
-      <div className="card" style={{ padding: '1.75rem', marginBottom: '2rem' }}>
-        <h2 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '1rem' }}>6 BACB Task List Domains</h2>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: '.75rem' }}>
-          {DOMAIN_NAMES.map(dn => (
-            <div key={dn} style={{
-              display: 'flex', alignItems: 'center', gap: '.75rem',
-              padding: '.75rem 1rem', background: 'var(--surface-alt)',
-              border: `1.5px solid ${DOMAIN_COLORS[dn]}22`,
-              borderLeft: `4px solid ${DOMAIN_COLORS[dn]}`,
-              borderRadius: 8,
-            }}>
-              <span style={{ fontSize: '1.4rem' }}>{DOMAIN_ICONS[dn]}</span>
-              <div>
-                <p style={{ fontWeight: 700, fontSize: '.82rem', color: DOMAIN_COLORS[dn] }}>
-                  Domain {LETTER_OF[dn]}
-                </p>
-                <p style={{ fontSize: '.8rem', color: '#475569' }}>{dn}</p>
+      {/* ACHIEVEMENTS + STREAK */}
+      {(earned.length > 0 || streak > 0) && (
+        <div className="ach-card fade-up fade-up-3">
+          <div className="ach-left">
+            {earned.length > 0 && (
+              <div className="ach-icons">
+                {earned.slice(0, 4).map((b, i) => (
+                  <span key={b.id} className={`badge b${(i % 4) + 1}`} title={b.label}>{b.icon}</span>
+                ))}
+              </div>
+            )}
+            <div className="ach-text">
+              <b>{earned.length} of {allBadges.length} milestones earned.</b>
+              <div className="small">
+                {modulesPassed} modules passed · {(safmeds?.totalTokens || 0)} SAFMEDS tokens · {formatDuration(stats?.totalMinutes || 0)} total
               </div>
             </div>
-          ))}
+          </div>
+          {streak > 0 && (
+            <div className="ach-streak">
+              <span className="num">{streak}</span>
+              <span className="lbl">DAY STREAK</span>
+            </div>
+          )}
         </div>
+      )}
+
+      {/* PRETEST SNAPSHOT */}
+      {pretestDomainScores && pretestDomainScores.length > 0 && (
+        <>
+          <div className="section-head"><h2>Pretest <i>findings</i></h2><span className="meta">— 30 questions · 6 domains</span></div>
+          <div className="pretest-card fade-up fade-up-4">
+            <div className="pretest-head">
+              <div className="pretest-title">Per-domain performance</div>
+              <div className="pretest-overall">Overall <span className="pct">{Math.round(pretestDomainScores.reduce((a,r) => a + (r.pct || 0), 0) / pretestDomainScores.length)}%</span></div>
+            </div>
+            {pretestDomainScores.map(r => {
+              const tier = (r.pct || 0) >= 80 ? 'strong' : (r.pct || 0) >= 70 ? 'mid' : 'weak'
+              const letter = LETTER_OF[r.name] || '?'
+              return (
+                <div key={r.name} className="pretest-bar-row">
+                  <span className="pretest-ltr">{letter}</span>
+                  <div className="pretest-track">
+                    <div className={`pretest-fill ${tier}`} style={{width:`${r.pct || 0}%`}}>{r.name}</div>
+                  </div>
+                  <span className={`pretest-score ${tier === 'strong' ? 'strong' : tier === 'weak' ? 'weak' : ''}`}>{r.pct || 0}%</span>
+                </div>
+              )
+            })}
+          </div>
+        </>
+      )}
+
+      {/* WEEKLY CALENDAR */}
+      {(stats?.daysStudied?.length > 0 || (stats?.todayMinutes || 0) > 0) && (
+        <>
+          <div className="section-head"><h2>This <i>week</i></h2><span className="meta">— Logged study minutes</span></div>
+          <div className="week-card fade-up fade-up-4">
+            <div>
+              <div className="week-eyebrow">— Last 7 days —</div>
+              <div className="week-grid">
+                {days.map(d => {
+                  const heightPct = d.mins === 0 ? 0 : Math.max(20, Math.round((d.mins / maxMins) * 100))
+                  return (
+                    <div key={d.iso} className={`day ${d.isToday ? 'today' : ''}`}>
+                      <div className="day-bar">
+                        <div className={`day-fill ${d.isToday ? 'today' : ''} ${d.mins === 0 ? 'empty' : ''}`} style={{height:`${heightPct}%`}}/>
+                      </div>
+                      <div className="day-label">{d.lbl}</div>
+                      <div className="day-mins">{fmtMins(d.mins)}</div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+            <div className="week-totals">
+              <div className="num">{fmtMins(totalMins)}</div>
+              <div className="lbl">This week</div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* MODE CARDS */}
+      <div className="section-head"><h2>Pick your <i>study mode</i></h2><span className="meta">— 4 modes mapped to your prep</span></div>
+      <div className="mode-grid fade-up fade-up-5">
+        {modes.map(m => (
+          <div key={m.cls} className={`mode ${m.cls}`} onClick={m.onClick}>
+            <span className={`mode-status ${m.status.cls}`}>{m.status.label}</span>
+            <div className="mode-icon">{m.icon}</div>
+            <div className="mode-name">{m.name}</div>
+            <div className="mode-meta">{m.meta}</div>
+            <div className="mode-desc">{m.desc}</div>
+            <span className="mode-cta">{m.cta} →</span>
+          </div>
+        ))}
       </div>
 
-      <div style={{ textAlign: 'center' }}>
-        <button className="btn btn-primary" style={{ fontSize: '1.05rem', padding: '.8rem 2.5rem' }} onClick={onBegin}>
-          Begin Diagnostic Pretest →
-        </button>
-        <p style={{ marginTop: '.75rem', fontSize: '.82rem', color: '#94a3b8' }}>
-          {PRETEST_QUESTIONS.length} questions · untimed · no feedback during test
-        </p>
-        <button onClick={onSkip}
-          style={{ marginTop: '1.1rem', padding: '.7rem 1.8rem', background: 'transparent', color: '#2c6e49', border: '2px solid #2c6e49', borderRadius: 10, fontSize: '.92rem', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
-          Skip pretest — study all 6 modules →
-        </button>
-        <p style={{ marginTop: '.5rem', fontSize: '.76rem', color: '#94a3b8', maxWidth: 400, margin: '.5rem auto 0' }}>
-          Skipping unlocks every module. You'll still need to pass each quiz (≥80%) to unlock the full exam.
-        </p>
+      {/* WEAK SPOTS */}
+      {weakSpotsCount > 0 && (
+        <div className="weak-card fade-up fade-up-6">
+          <div className="weak-icon">🔍</div>
+          <div className="weak-text">
+            <b>{weakSpotsCount} weak spot{weakSpotsCount === 1 ? '' : 's'} in your review queue.</b>
+            <div className="small">Items you missed before. Get them right twice in a row to clear them.</div>
+          </div>
+          <button className="weak-action" onClick={onReviewWeakSpots}>Start Review →</button>
+        </div>
+      )}
+
+      {/* DOMAIN SPOT-CHECK */}
+      <div className="section-head"><h2>Bank <i>coverage</i></h2><span className="meta">— {bankTotal} questions · 6 domains</span></div>
+      <div className="dom-list fade-up fade-up-7">
+        {DOMAIN_NAMES.map(d => (
+          <div key={d} className="dom-row">
+            <span className="dom-letter">{LETTER_OF[d]}</span>
+            <div className="dom-body">
+              <div className="dom-name">{d}</div>
+              <div className="dom-count">{domainCounts[d]} in bank</div>
+            </div>
+            <button className="spot-btn" onClick={() => onSpotCheck?.(d)}>▸ Spot 20Q</button>
+          </div>
+        ))}
       </div>
+
+      {/* FIRST-TIME CTAs (only when nothing started) */}
+      {!pretestDone && !skippedPretest && (
+        <div style={{ textAlign: 'center', marginTop: '1.5rem' }}>
+          <button className="btn btn-primary" style={{ fontSize: '1rem', padding: '.85rem 2.4rem' }} onClick={onBegin}>
+            Begin Diagnostic Pretest →
+          </button>
+          <p style={{ marginTop: '.6rem', fontSize: '.78rem', color: 'var(--citrine-ink-mute)', letterSpacing: '0.05em' }}>
+            {PRETEST_QUESTIONS.length} questions · untimed · no feedback during test
+          </p>
+          <button onClick={onSkip} className="btn btn-secondary"
+            style={{ marginTop: '.9rem', fontSize: '.86rem', padding: '.7rem 1.6rem' }}>
+            Skip pretest, study all 6 modules →
+          </button>
+          <p style={{ marginTop: '.5rem', fontSize: '.74rem', color: 'var(--citrine-ink-mute)', maxWidth: 460, margin: '.5rem auto 0' }}>
+            Skipping unlocks every module. You will still need to pass each quiz (≥80%) to unlock the full mock exam.
+          </p>
+        </div>
+      )}
     </div>
   )
 }
@@ -2318,6 +2519,16 @@ export default function App() {
           stats={state.stats}
           weakSpotsCount={Object.keys(state.weakSpots || {}).length}
           safmeds={state.safmeds}
+          pretestDomainScores={state.pretestDomainScores}
+          moduleStatus={state.moduleStatus}
+          weakDomains={state.weakDomains}
+          examScores={state.examDomainScores}
+          skippedPretest={state.skippedPretest}
+          onNav={handleNav}
+          onSpotCheck={(dn) => {
+            const qs = sampleDomainQuestions(dn, 20, PRETEST_QUESTIONS.map(q => q.stem))
+            setState(s => ({ ...s, phase: 'domain_quiz', domainQuizDomain: dn, domainQuizQuestions: qs, domainQuizAnswers: {}, domainQuizCurrentIdx: 0 }))
+          }}
           onOpenSafmeds={() => setState(s => ({ ...s, phase: 'safmeds' }))}
           onReviewWeakSpots={() => {
             const items = Object.values(state.weakSpots || {})
