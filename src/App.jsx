@@ -797,286 +797,391 @@ function PretestResultsScreen({ domainScores, weakDomains, onStudy, onSkip }) {
 // ─── ModulesScreen ────────────────────────────────────────────────────────────
 function ModulesScreen({ weakDomains, moduleStatus, onSelectModule, onStartExam, onSpotCheck }) {
   const allPassed = weakDomains.length > 0 && weakDomains.every(d => moduleStatus[d] === 'passed')
+  const passedCount = weakDomains.filter(d => moduleStatus[d] === 'passed').length
+  const pctComplete = weakDomains.length === 0 ? 0 : Math.round((passedCount / weakDomains.length) * 100)
 
   return (
     <div className="page">
-      <h2 style={{ fontSize: '1.5rem', fontWeight: 800, marginBottom: '.4rem' }}>Study Plan</h2>
-      <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem' }}>
-        Pass each 5-Q module quiz to unlock the full exam — or run a 20-Q domain spot-check anytime.
-      </p>
+      <div className="clinical-pro">
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(260px,1fr))', gap: '1rem', marginBottom: '1.75rem' }}>
-        {weakDomains.map(dn => {
-          const status = moduleStatus[dn] || 'available'
-          const color = DOMAIN_COLORS[dn]
-          return (
-            <div key={dn} className="card" style={{ padding: '1.5rem', borderTop: `4px solid ${color}` }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '.75rem' }}>
-                <span style={{ fontSize: '2rem' }}>{DOMAIN_ICONS[dn]}</span>
-                {status === 'passed'
-                  ? <span className="badge badge-success">✓ Passed</span>
-                  : <span className="badge badge-warning">In Progress</span>}
-              </div>
-              <p style={{ fontWeight: 700, fontSize: '.92rem', color, marginBottom: '.3rem' }}>Domain {LETTER_OF[dn]}</p>
-              <p style={{ fontSize: '.88rem', color: '#475569', marginBottom: '1rem' }}>{dn}</p>
-              <p style={{ fontSize: '.8rem', color: '#94a3b8', marginBottom: '.9rem' }}>
-                4 concept cards · 5 practice questions
-              </p>
-              <div style={{ display: 'flex', gap: '.5rem', flexDirection: 'column' }}>
-                <button
-                  onClick={() => onSelectModule(dn)}
-                  className={`btn btn-sm ${status === 'passed' ? 'btn-ghost' : 'btn-primary'}`}
-                  style={{ width: '100%', ...(status !== 'passed' ? { background: color, borderColor: color } : {}) }}
-                >
-                  {status === 'passed' ? '📖 Review Concepts' : '▶ Start Module'}
-                </button>
-                <button
-                  onClick={() => onSpotCheck(dn)}
-                  className="btn btn-sm"
-                  style={{ width: '100%', background: 'var(--surface)', color: color, border: `1.5px solid ${color}`, fontWeight: 700 }}
-                >
-                  🎯 Spot-Check 20Q
-                </button>
-              </div>
+        <div className="clp-subheader">
+          <div className="clp-crumb">
+            <span>RBT Prep</span><span className="sep">/</span>
+            <span className="now">Study Plan</span>
+          </div>
+          <div className="clp-subheader-actions">
+            <button className="clp-subheader-btn">⤓ Print Plan</button>
+          </div>
+        </div>
+
+        <div className="clp-main">
+
+          {/* HEADER BANNER */}
+          <div className="clp-banner">
+            <div className="clp-tags">
+              <span className="clp-tag accent">Modules</span>
+              <span className="clp-tag muted">{weakDomains.length} domains</span>
+              {allPassed && <span className="clp-tag success">All passed — exam unlocked</span>}
             </div>
-          )
-        })}
-      </div>
+            <h1 className="clp-h1">Study plan for the RBT credential.</h1>
+            <p className="clp-deck">Pass each 5-question module quiz at 80% or higher to unlock the full mock exam. Or run a 20-question domain spot-check anytime to gauge readiness.</p>
 
-      <div style={{ textAlign: 'center' }}>
-        <button
-          className="btn btn-primary"
-          style={{ fontSize: '1.05rem', padding: '.8rem 2.5rem', opacity: allPassed ? 1 : .45 }}
-          disabled={!allPassed}
-          onClick={onStartExam}
-          title={!allPassed ? 'Pass all module quizzes first' : ''}
-        >
-          🏁 Begin Full Exam
-        </button>
-        {!allPassed && (
-          <p style={{ marginTop: '.6rem', fontSize: '.82rem', color: '#94a3b8' }}>
-            Pass all {weakDomains.length} module quizzes to unlock
-          </p>
-        )}
+            <div className="clp-stat-row">
+              <div className="clp-stat-item"><div className="lbl">Modules passed</div><div className="val">{passedCount} of {weakDomains.length}</div></div>
+              <div className="clp-stat-item"><div className="lbl">Progress</div><div className="val">{pctComplete}%</div></div>
+              <div className="clp-stat-item"><div className="lbl">Pass mark</div><div className="val">80%</div></div>
+              <div className="clp-stat-item"><div className="lbl">Mock exam</div><div className="val">{allPassed ? 'Unlocked' : 'Locked'}</div></div>
+            </div>
+          </div>
+
+          {/* PROGRESS BAR */}
+          <div className="clp-progress">
+            <div className="clp-progress-track"><div className="clp-progress-fill" style={{ width: `${pctComplete}%` }}/></div>
+            <div className="clp-progress-text">{passedCount} / {weakDomains.length} modules · {pctComplete}%</div>
+          </div>
+
+          {/* MODULE GRID */}
+          <div className="clp-grid">
+            {weakDomains.map(dn => {
+              const status = moduleStatus[dn] || 'available'
+              const color = DOMAIN_COLORS[dn]
+              const statusTag = status === 'passed'
+                ? <span className="clp-tag success">✓ Passed</span>
+                : <span className="clp-tag warn">In Progress</span>
+              return (
+                <div key={dn} className="clp-module-card" style={{ borderTopColor: color }}>
+                  <div className="clp-module-head">
+                    <span className="clp-module-icon">{DOMAIN_ICONS[dn]}</span>
+                    {statusTag}
+                  </div>
+                  <div className="clp-module-letter">DOMAIN {LETTER_OF[dn]}</div>
+                  <div className="clp-module-name">{dn}</div>
+                  <div className="clp-module-meta">4 concept cards · 5 practice questions</div>
+                  <div className="clp-module-actions">
+                    <button onClick={() => onSelectModule(dn)} className={`clp-btn ${status === 'passed' ? '' : 'primary'}`}>
+                      {status === 'passed' ? '📖 Review Concepts' : '▶ Start Module'}
+                    </button>
+                    <button onClick={() => onSpotCheck(dn)} className="clp-btn">🎯 Spot-Check 20Q</button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          {/* FOOTER CTA */}
+          <div className="clp-action-row" style={{ justifyContent: 'center' }}>
+            <button
+              className="clp-btn primary"
+              style={{ padding: '12px 36px', fontSize: '1rem' }}
+              disabled={!allPassed}
+              onClick={onStartExam}
+              title={!allPassed ? 'Pass all module quizzes first' : ''}
+            >
+              🏁 Begin Full Mock Exam
+            </button>
+          </div>
+          {!allPassed && (
+            <p style={{ marginTop: '10px', fontSize: '.82rem', color: 'var(--clp-ink-mute)', textAlign: 'center' }}>
+              Pass all {weakDomains.length} module quizzes to unlock the full mock exam.
+            </p>
+          )}
+        </div>
       </div>
     </div>
   )
 }
 
-// ─── ModuleScreen (content + quiz) ───────────────────────────────────────────
+// ─── ModuleScreen (content + quiz + results) ─────────────────────────────────
+// Clinical Pro redesign — clean professional, healthcare-grade chrome,
+// single clinical-blue accent, with per-domain colors retained as
+// secondary wayfinding accents (top border, dot indicators).
 function ModuleScreen({ domainName, modulePhase, quizAnswers, quizSubmitted, onAnswer, onSubmitQuiz, onRetryQuiz, onBackToModules, onStartQuiz, onReviewConcepts }) {
   const mod = MODULES[domainName]
   const [conceptIdx, setConceptIdx] = useState(0)
   const [quizIdx, setQuizIdx] = useState(0)
+  const [flippedTerms, setFlippedTerms] = useState({})
   const color = DOMAIN_COLORS[domainName]
 
   if (!mod) return <div className="page"><p>Module not found.</p></div>
 
+  // ===== CONCEPT (CONTENT) PHASE =====
   if (modulePhase === 'content') {
     const enh = MODULE_ENHANCEMENTS[domainName]?.[conceptIdx] || {}
     const concept = { ...mod.concepts[conceptIdx], ...enh }
     const ctype = CONCEPT_TYPES[conceptIdx % CONCEPT_TYPES.length]
+    const totalConcepts = mod.concepts.length
+    const conceptPct = Math.round(((conceptIdx + 1) / totalConcepts) * 100)
+    const tagKey = ctype.label.toLowerCase().includes('critical') ? 'warn'
+                  : ctype.label.toLowerCase().includes('strategy') ? 'accent'
+                  : 'accent'
+
+    const toggleTerm = (k) => setFlippedTerms(prev => ({ ...prev, [k]: !prev[k] }))
+
     return (
       <div className="page">
         <GlobalStyles/>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '.75rem', marginBottom: '1.25rem' }}>
-          <button className="btn btn-ghost btn-sm" onClick={onBackToModules}>← Back</button>
-          <h2 style={{ fontWeight: 800, color, fontSize: '1.2rem' }}>
-            {DOMAIN_ICONS[domainName]} {domainName}
-          </h2>
-        </div>
+        <div className="clinical-pro">
 
-        {/* Progress dots */}
-        <div style={{ display: 'flex', gap: 6, marginBottom: '1.25rem', alignItems: 'center' }}>
-          {mod.concepts.map((_,i) => (
-            <div key={i} onClick={() => setConceptIdx(i)} style={{
-              height: 8, borderRadius: 99, cursor: 'pointer', flexShrink: 0,
-              width: i === conceptIdx ? 28 : 8,
-              background: i <= conceptIdx ? ctype.color : '#e2e8f0',
-              transition: 'all .3s ease',
-            }}/>
-          ))}
-          <span style={{ fontSize: '.78rem', color: '#94a3b8', marginLeft: 6 }}>{conceptIdx + 1} / {mod.concepts.length}</span>
-        </div>
-
-        <div key={`${domainName}-${conceptIdx}`} className="concept-in"
-          style={{ marginBottom: '1.25rem', borderRadius: 12, overflow: 'hidden', border: `1px solid ${ctype.border}`, boxShadow: '0 2px 10px rgba(0,0,0,0.07)' }}>
-          <div style={{ background: ctype.bg, padding: '9px 16px', borderBottom: `1px solid ${ctype.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 14 }}>{ctype.icon}</span>
-              <span style={{ fontSize: 11, fontWeight: 800, color: ctype.color, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{ctype.label}</span>
+          <div className="clp-subheader">
+            <div className="clp-crumb">
+              <button className="clp-subheader-btn" onClick={onBackToModules}>← Back</button>
+              <span style={{ marginLeft: 6 }}>RBT Prep</span><span className="sep">/</span>
+              <span>Modules</span><span className="sep">/</span>
+              <span className="now">{DOMAIN_ICONS[domainName]} {domainName}</span>
             </div>
-            <div style={{ display: 'flex', gap: '.4rem' }}>
-              {mod.concepts.map((c, i) => (
-                <button key={i} onClick={() => setConceptIdx(i)} style={{
-                  padding: '.2rem .55rem', borderRadius: 99,
-                  background: i === conceptIdx ? color : '#f1f5f9',
-                  color: i === conceptIdx ? '#fff' : '#64748b',
-                  border: 'none', fontSize: '.72rem', fontWeight: 600, cursor: 'pointer',
-                }}>
-                  {i + 1}
-                </button>
-              ))}
+            <div className="clp-subheader-actions">
+              <button className="clp-subheader-btn">★ Bookmark</button>
             </div>
           </div>
-          <div style={{ background: 'var(--surface)', padding: '1.4rem 1.5rem' }}>
-            <h3 style={{ fontWeight: 800, fontSize: '1.05rem', color: ctype.color, marginBottom: '.75rem', lineHeight: 1.35 }}>{concept.title}</h3>
-            <p style={{ lineHeight: 1.78, color: '#374151', fontSize: '.93rem', whiteSpace: 'pre-wrap', margin: 0 }}>{concept.body}</p>
 
-            {concept.example && (
-              <div style={{ marginTop: '1.1rem', background: '#fffbeb', borderLeft: '4px solid #f59e0b', borderRadius: '0 10px 10px 0', padding: '.85rem 1rem' }}>
-                <div style={{ fontSize: 10, fontWeight: 800, color: '#92400e', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 5 }}>
-                  <span>📋</span> Applied Example
-                </div>
-                <p style={{ fontSize: '.88rem', lineHeight: 1.7, color: '#374151', margin: 0, fontStyle: 'italic' }}>{concept.example}</p>
+          <div className="clp-main">
+
+            {/* HEADER BANNER */}
+            <div className="clp-banner" style={{ borderTopColor: color }}>
+              <div className="clp-tags">
+                <span className="clp-tag accent">{ctype.label.toUpperCase()}</span>
+                <span className="clp-tag muted">CONCEPT {conceptIdx + 1} OF {totalConcepts}</span>
+                <span className="clp-tag muted">DOMAIN {LETTER_OF[domainName]}</span>
               </div>
-            )}
+              <h1 className="clp-h1">{concept.title}</h1>
+              {concept.body && <p className="clp-deck">{(concept.body.split('. ')[0] || concept.body).slice(0, 200)}{concept.body.length > 200 ? '…' : '.'}</p>}
 
-            {concept.visual && (
-              <div className="visual-card" style={{ marginTop: '1.1rem', background: 'var(--surface-alt)', borderRadius: 10, padding: '1rem .5rem' }}>
-                <ConceptVisual type={concept.visual}/>
+              <div className="clp-stat-row">
+                <div className="clp-stat-item"><div className="lbl">Domain</div><div className="val">{domainName}</div></div>
+                <div className="clp-stat-item"><div className="lbl">Concept type</div><div className="val">{ctype.label}</div></div>
+                <div className="clp-stat-item"><div className="lbl">Position</div><div className="val">{conceptIdx + 1} of {totalConcepts}</div></div>
+                <div className="clp-stat-item"><div className="lbl">Pass mark</div><div className="val">80%</div></div>
               </div>
-            )}
+            </div>
 
-            {concept.keyTerms && concept.keyTerms.length > 0 && (
-              <div style={{ marginTop: '1.1rem' }}>
-                <div style={{ fontSize: 10, fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 5 }}>
-                  <span>🔑</span> Key Terms · tap cards to reveal definitions
+            {/* PROGRESS */}
+            <div className="clp-progress">
+              <div className="clp-progress-track"><div className="clp-progress-fill" style={{ width: `${conceptPct}%` }}/></div>
+              <div className="clp-progress-text">{conceptIdx + 1} of {totalConcepts} concepts · {conceptPct}%</div>
+            </div>
+
+            {/* CONCEPT CONTENT CARD */}
+            <div key={`${domainName}-${conceptIdx}`} className="concept-in clp-card">
+              <div className="clp-card-head">
+                <div className="clp-card-title">
+                  <span className="ic" style={{ background: color }}>{ctype.icon}</span>
+                  Concept Content
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(132px,1fr))', gap: 8 }}>
-                  {concept.keyTerms.map((kt, ki) => (
-                    <KeyTermCard key={ki} term={kt.term} def={kt.def} color={ctype.color} bg={ctype.bg} border={ctype.border}/>
+                <div className="clp-pager">
+                  {mod.concepts.map((c, i) => (
+                    <button key={i} className={i === conceptIdx ? 'active' : ''} onClick={() => setConceptIdx(i)}>{i + 1}</button>
                   ))}
                 </div>
               </div>
-            )}
-          </div>
-        </div>
+              <div className="clp-card-body">
+                <h2 className="clp-section-title">{concept.title}</h2>
+                <p className="clp-text" style={{ whiteSpace: 'pre-wrap' }}>{concept.body}</p>
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <button className="btn btn-ghost btn-sm" onClick={() => setConceptIdx(Math.max(0, conceptIdx - 1))} disabled={conceptIdx === 0}>← Prev</button>
-          {conceptIdx < mod.concepts.length - 1
-            ? <button className="btn btn-primary btn-sm" onClick={() => setConceptIdx(conceptIdx + 1)}>Next Concept →</button>
-            : <button className="btn btn-primary" onClick={onStartQuiz} style={{ background: color, borderColor: color }}>
-                Take Quiz →
-              </button>
-          }
+                {concept.example && (
+                  <div className="clp-callout">
+                    <div className="clp-callout-label">📋 Applied Example</div>
+                    <div className="clp-callout-text" style={{ fontStyle: 'italic' }}>{concept.example}</div>
+                  </div>
+                )}
+
+                {concept.visual && (
+                  <div className="visual-card" style={{ marginTop: '1.1rem', background: 'var(--clp-paper-2)', border: '1px solid var(--clp-line)', borderRadius: 4, padding: '1rem .5rem' }}>
+                    <ConceptVisual type={concept.visual}/>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* KEY TERMS */}
+            {concept.keyTerms && concept.keyTerms.length > 0 && (
+              <div className="clp-terms-section">
+                <div className="clp-terms-head">🔑 Key Terms · Click to define</div>
+                <div className="clp-terms-body">
+                  <div className="clp-term-grid">
+                    {concept.keyTerms.map((kt, ki) => {
+                      const k = `${conceptIdx}-${ki}`
+                      const isFlipped = !!flippedTerms[k]
+                      return (
+                        <div key={ki} className={`clp-term ${isFlipped ? 'flipped' : ''}`} onClick={() => toggleTerm(k)}>
+                          <div className="name">{kt.term}</div>
+                          {isFlipped
+                            ? <div className="def">{kt.def}</div>
+                            : <div className="hint">Click to define</div>
+                          }
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ACTION FOOTER */}
+            <div className="clp-action-row">
+              <button className="clp-btn" onClick={() => setConceptIdx(Math.max(0, conceptIdx - 1))} disabled={conceptIdx === 0}>← Previous Concept</button>
+              {conceptIdx < mod.concepts.length - 1
+                ? <button className="clp-btn primary" onClick={() => setConceptIdx(conceptIdx + 1)}>Next Concept →</button>
+                : <button className="clp-btn primary" onClick={onStartQuiz}>Take Module Quiz →</button>
+              }
+            </div>
+          </div>
         </div>
       </div>
     )
   }
 
-  // Quiz phase
-  const q = mod.practice[quizIdx]
+  // ===== QUIZ RESULTS PHASE =====
   const totalQ = mod.practice.length
   const answered = Object.keys(quizAnswers).length
 
   if (quizSubmitted) {
     const correct = mod.practice.filter((q, i) => quizAnswers[i] === q.correct).length
     const passed = correct >= 4
+    const pct = Math.round((correct / totalQ) * 100)
     return (
       <div className="page">
-        <h2 style={{ fontWeight: 800, fontSize: '1.4rem', marginBottom: '1rem' }}>
-          {DOMAIN_ICONS[domainName]} Module Quiz Results
-        </h2>
-        <div className="card" style={{ padding: '1.75rem', marginBottom: '1.25rem', textAlign: 'center', borderTop: `4px solid ${passed ? '#16a34a' : '#dc2626'}` }}>
-          <div style={{ fontSize: '3rem', fontWeight: 900, color: passed ? '#16a34a' : '#dc2626' }}>{correct}/{totalQ}</div>
-          <p style={{ fontSize: '1.1rem', fontWeight: 700, color: passed ? '#16a34a' : '#dc2626', marginTop: '.4rem' }}>
-            {passed ? '✓ Passed! Domain unlocked.' : '✗ Not quite — review and retry'}
-          </p>
-          <p style={{ color: 'var(--text-muted)', fontSize: '.88rem', marginTop: '.3rem' }}>Need ≥ 4/5 (80%) to pass</p>
-        </div>
+        <div className="clinical-pro">
 
-        {!passed && (
-          <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span>🔍</span> Review your {totalQ - correct} missed question{(totalQ - correct) > 1 ? 's' : ''} before retrying
-          </div>
-        )}
-
-        {mod.practice.map((q, i) => {
-          const chosen = quizAnswers[i]
-          const isCorrect = chosen === q.correct
-          return (
-            <div key={i} className="card" style={{ padding: '1.25rem', marginBottom: '.75rem', borderLeft: `4px solid ${isCorrect ? '#16a34a' : '#dc2626'}` }}>
-              <p style={{ fontWeight: 600, marginBottom: '.5rem', fontSize: '.92rem' }}>{i + 1}. {q.stem}</p>
-              <p style={{ fontSize: '.85rem', marginBottom: '.35rem' }}>
-                <span style={{ color: isCorrect ? '#16a34a' : '#dc2626', fontWeight: 700 }}>
-                  {isCorrect ? '✓' : '✗'} You chose:
-                </span> {chosen !== undefined ? q.options[chosen] : 'No answer'}
-              </p>
-              {!isCorrect && <p style={{ fontSize: '.85rem', color: '#16a34a', marginBottom: '.35rem' }}>✓ Correct: {q.options[q.correct]}</p>}
-              <p style={{ fontSize: '.82rem', color: 'var(--text-muted)', background: 'var(--surface-alt)', padding: '.5rem .75rem', borderRadius: 6, marginTop: '.4rem' }}>
-                💡 {q.rationale}
-              </p>
+          <div className="clp-subheader">
+            <div className="clp-crumb">
+              <button className="clp-subheader-btn" onClick={onBackToModules}>← Back</button>
+              <span style={{ marginLeft: 6 }}>RBT Prep</span><span className="sep">/</span>
+              <span>Modules</span><span className="sep">/</span>
+              <span>{DOMAIN_ICONS[domainName]} {domainName}</span><span className="sep">/</span>
+              <span className="now">Quiz Results</span>
             </div>
-          )
-        })}
+          </div>
 
-        <div style={{ display: 'flex', gap: '.75rem', marginTop: '1rem', flexWrap: 'wrap' }}>
-          {!passed && (
-            <button className="btn btn-secondary" onClick={onReviewConcepts} style={{ borderColor: color, color }}>
-              📖 Re-read Concepts
-            </button>
-          )}
-          {!passed && (
-            <button className="btn btn-primary" onClick={onRetryQuiz} style={{ background: color, borderColor: color }}>
-              ↺ Retry Quiz
-            </button>
-          )}
-          <button className="btn btn-ghost" onClick={onBackToModules}>← Back to Study Plan</button>
+          <div className="clp-main">
+
+            <div className={`clp-banner ${passed ? 'success' : 'danger'}`}>
+              <div className="clp-tags">
+                {passed
+                  ? <span className="clp-tag success">✓ Passed — Domain Unlocked</span>
+                  : <span className="clp-tag warn">⚠ Below pass mark</span>
+                }
+                <span className="clp-tag muted">Pass mark: 80%</span>
+              </div>
+
+              <div className={`clp-score ${passed ? 'pass' : 'fail'}`}>
+                <div className="clp-score-num">{correct}/{totalQ}</div>
+                <div className="clp-score-status">{pct}% — {passed ? 'PASSED' : 'NOT PASSED'}</div>
+                <div className="clp-score-meta">{passed ? 'You\'ve unlocked this domain.' : `Review the ${totalQ - correct} missed item${totalQ - correct > 1 ? 's' : ''} below and retry.`}</div>
+              </div>
+            </div>
+
+            {!passed && (
+              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--clp-ink-mute)', textTransform: 'uppercase', letterSpacing: '0.1em', margin: '14px 0 10px', display: 'flex', alignItems: 'center', gap: 6 }}>
+                🔍 Item-Level Review
+              </div>
+            )}
+
+            {/* Item-level review cards */}
+            {mod.practice.map((q, i) => {
+              const chosen = quizAnswers[i]
+              const isCorrect = chosen === q.correct
+              return (
+                <div key={i} className={`clp-review-card ${isCorrect ? '' : 'fail'}`}>
+                  <div className="clp-review-q">{i + 1}. {q.stem}</div>
+                  <div className="clp-review-row">
+                    <span className={isCorrect ? 'green' : 'red'}>{isCorrect ? '✓' : '✗'} You chose:</span> {chosen !== undefined ? q.options[chosen] : 'No answer'}
+                  </div>
+                  {!isCorrect && (
+                    <div className="clp-review-row"><span className="green">✓ Correct:</span> {q.options[q.correct]}</div>
+                  )}
+                  <div className="clp-rationale">💡 {q.rationale}</div>
+                </div>
+              )
+            })}
+
+            <div className="clp-action-row" style={{ marginTop: 14, flexWrap: 'wrap' }}>
+              {!passed && <button className="clp-btn" onClick={onReviewConcepts}>📖 Re-read Concepts</button>}
+              {!passed && <button className="clp-btn primary" onClick={onRetryQuiz}>↺ Retry Quiz</button>}
+              <button className="clp-btn" onClick={onBackToModules}>← Back to Study Plan</button>
+            </div>
+          </div>
         </div>
       </div>
     )
   }
 
+  // ===== QUIZ-TAKING PHASE =====
+  const q = mod.practice[quizIdx]
+  const quizPct = Math.round(((quizIdx + 1) / totalQ) * 100)
   return (
     <div className="page">
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
-        <h2 style={{ fontWeight: 800, color, fontSize: '1.1rem' }}>{DOMAIN_ICONS[domainName]} Module Quiz</h2>
-        <span style={{ fontSize: '.85rem', color: 'var(--text-muted)' }}>Q{quizIdx + 1} of {totalQ}</span>
-      </div>
+      <div className="clinical-pro">
 
-      <div className="progress-bar" style={{ marginBottom: '1.5rem' }}>
-        <div className="progress-fill" style={{ width: `${((quizIdx + 1) / totalQ) * 100}%`, background: color }} />
-      </div>
-
-      <div className="card" style={{ padding: '1.75rem', marginBottom: '1.25rem' }}>
-        <p style={{ fontWeight: 500, fontSize: '1rem', marginBottom: '1.25rem', lineHeight: 1.65 }}>{q.stem}</p>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '.6rem' }}>
-          {q.options.map((opt, i) => {
-            const selected = quizAnswers[quizIdx] === i
-            return (
-              <button key={i} onClick={() => onAnswer(quizIdx, i)} style={{
-                textAlign: 'left', padding: '.85rem 1.1rem',
-                border: `2px solid ${selected ? color : '#e2e8f0'}`,
-                background: selected ? `${color}18` : '#fff',
-                borderRadius: 8, fontSize: '.92rem', cursor: 'pointer',
-                fontFamily: 'inherit', display: 'flex', alignItems: 'flex-start', gap: '.75rem',
-                transition: 'all .12s',
-              }}>
-                <span style={{
-                  minWidth: 26, height: 26, borderRadius: '50%',
-                  background: selected ? color : '#f1f5f9',
-                  color: selected ? '#fff' : '#64748b',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: '.78rem', fontWeight: 700, flexShrink: 0, marginTop: '.05rem',
-                }}>{String.fromCharCode(65 + i)}</span>
-                <span>{opt}</span>
-              </button>
-            )
-          })}
+        <div className="clp-subheader">
+          <div className="clp-crumb">
+            <button className="clp-subheader-btn" onClick={onBackToModules}>← Exit Quiz</button>
+            <span style={{ marginLeft: 6 }}>RBT Prep</span><span className="sep">/</span>
+            <span>Modules</span><span className="sep">/</span>
+            <span>{DOMAIN_ICONS[domainName]} {domainName}</span><span className="sep">/</span>
+            <span className="now">Module Quiz</span>
+          </div>
+          <div style={{ fontSize: '.82rem', color: 'var(--clp-ink-mute)', fontWeight: 600 }}>
+            Question {quizIdx + 1} of {totalQ}
+          </div>
         </div>
-      </div>
 
-      <div style={{ display: 'flex', gap: '.75rem', justifyContent: 'space-between' }}>
-        <button className="btn btn-ghost btn-sm" onClick={() => setQuizIdx(Math.max(0, quizIdx - 1))} disabled={quizIdx === 0}>← Prev</button>
-        {quizIdx < totalQ - 1
-          ? <button className="btn btn-primary btn-sm" onClick={() => setQuizIdx(quizIdx + 1)} style={{ background: color, borderColor: color }}>Next →</button>
-          : <button className="btn btn-primary btn-sm" onClick={() => { setQuizIdx(0); onSubmitQuiz() }}
-              disabled={answered < totalQ} style={{ background: color, borderColor: color }}>
-              Submit Quiz ✓
-            </button>
-        }
+        <div className="clp-main">
+
+          {/* HEADER BANNER */}
+          <div className="clp-banner" style={{ borderTopColor: color }}>
+            <div className="clp-tags">
+              <span className="clp-tag accent">MODULE QUIZ</span>
+              <span className="clp-tag muted">DOMAIN {LETTER_OF[domainName]}</span>
+              <span className="clp-tag muted">Need ≥ 4/5 (80%) to pass</span>
+            </div>
+            <h1 className="clp-h1">Knowledge check.</h1>
+            <p className="clp-deck">Answer all {totalQ} questions, then submit. You can navigate between questions before submitting.</p>
+          </div>
+
+          {/* PROGRESS */}
+          <div className="clp-progress">
+            <div className="clp-progress-track"><div className="clp-progress-fill" style={{ width: `${quizPct}%` }}/></div>
+            <div className="clp-progress-text">{quizIdx + 1} of {totalQ} · {answered} answered</div>
+          </div>
+
+          {/* QUESTION CARD */}
+          <div className="clp-card">
+            <div className="clp-card-head">
+              <div className="clp-card-title">
+                <span className="ic">Q</span>
+                Question {quizIdx + 1}
+              </div>
+              <div className="clp-pager">
+                {mod.practice.map((_, i) => (
+                  <button key={i} className={i === quizIdx ? 'active' : ''} onClick={() => setQuizIdx(i)}>{i + 1}</button>
+                ))}
+              </div>
+            </div>
+            <div className="clp-card-body">
+              <p className="clp-q-stem">{q.stem}</p>
+              <div className="clp-options">
+                {q.options.map((opt, i) => {
+                  const selected = quizAnswers[quizIdx] === i
+                  return (
+                    <button key={i} onClick={() => onAnswer(quizIdx, i)} className={`clp-option ${selected ? 'selected' : ''}`}>
+                      <span className="letter">{String.fromCharCode(65 + i)}</span>
+                      <span style={{ flex: 1 }}>{opt}</span>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* ACTION FOOTER */}
+          <div className="clp-action-row">
+            <button className="clp-btn" onClick={() => setQuizIdx(Math.max(0, quizIdx - 1))} disabled={quizIdx === 0}>← Previous</button>
+            {quizIdx < totalQ - 1
+              ? <button className="clp-btn primary" onClick={() => setQuizIdx(quizIdx + 1)}>Next →</button>
+              : <button className="clp-btn primary" onClick={() => { setQuizIdx(0); onSubmitQuiz() }} disabled={answered < totalQ}>Submit Quiz ✓</button>
+            }
+          </div>
+        </div>
       </div>
     </div>
   )
