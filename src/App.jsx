@@ -473,8 +473,8 @@ function NavBar({ phase, pretestSubmitted, skippedPretest, moduleStatus, weakDom
   return (
     <nav style={{
       position: 'sticky', top: 0, zIndex: 100,
-      background: '#2c6e49', borderBottom: '3px solid #1e4d33',
-      boxShadow: '0 2px 8px rgba(0,0,0,.18)',
+      background: '#131311', borderBottom: '3px solid #d99916',
+      boxShadow: '0 2px 8px rgba(19,19,17,.18)',
     }}>
       <div style={{
         maxWidth: 860, margin: '0 auto',
@@ -491,12 +491,13 @@ function NavBar({ phase, pretestSubmitted, skippedPretest, moduleStatus, weakDom
                 onClick={() => !locked && onNav(item.id)}
                 disabled={locked}
                 style={{
-                  background: active ? 'rgba(255,255,255,.22)' : 'transparent',
-                  color: locked ? 'rgba(255,255,255,.35)' : '#fff',
-                  border: active ? '1.5px solid rgba(255,255,255,.5)' : '1.5px solid transparent',
-                  borderRadius: 8, padding: '.35rem .75rem',
-                  fontSize: '.82rem', fontWeight: 600, cursor: locked ? 'not-allowed' : 'pointer',
+                  background: active ? '#d99916' : 'transparent',
+                  color: locked ? 'rgba(251,247,236,.32)' : active ? '#131311' : '#fbf7ec',
+                  border: active ? '1.5px solid #d99916' : '1.5px solid transparent',
+                  borderRadius: 4, padding: '.35rem .75rem',
+                  fontSize: '.82rem', fontWeight: 700, cursor: locked ? 'not-allowed' : 'pointer',
                   display: 'flex', alignItems: 'center', gap: '.3rem',
+                  letterSpacing: '0.02em',
                   transition: 'all .15s',
                 }}
               >
@@ -512,14 +513,14 @@ function NavBar({ phase, pretestSubmitted, skippedPretest, moduleStatus, weakDom
             onClick={onToggleTheme}
             title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
             className="btn btn-sm"
-            style={{ background: 'rgba(255,255,255,.15)', color: '#fff', borderColor: 'rgba(255,255,255,.3)', fontSize: '.95rem', padding: '.35rem .65rem', lineHeight: 1 }}
+            style={{ background: 'transparent', color: '#fbf7ec', borderColor: 'rgba(251,247,236,.25)', fontSize: '.95rem', padding: '.35rem .65rem', lineHeight: 1, borderRadius: 4 }}
           >
             {theme === 'dark' ? '☀️' : '🌙'}
           </button>
           <button
             onClick={onReset}
             className="btn btn-sm"
-            style={{ background: 'rgba(255,255,255,.15)', color: '#fff', borderColor: 'rgba(255,255,255,.3)', fontSize: '.78rem' }}
+            style={{ background: 'transparent', color: '#fbf7ec', borderColor: 'rgba(251,247,236,.25)', fontSize: '.78rem', borderRadius: 4 }}
           >
             ↺ Reset
           </button>
@@ -856,19 +857,20 @@ function PretestScreen({ questions, answers, onAnswer, onSubmit, onBack }) {
                 onClick={() => onAnswer(currentIdx, i)}
                 style={{
                   textAlign: 'left', padding: '.85rem 1.1rem',
-                  border: `2px solid ${selected ? '#2c6e49' : '#e2e8f0'}`,
-                  background: selected ? '#d1fae5' : '#fff',
-                  borderRadius: 8, fontSize: '.92rem', cursor: 'pointer',
+                  border: `2px solid ${selected ? '#131311' : '#e0d8bf'}`,
+                  background: selected ? '#fbecc4' : '#fff',
+                  borderRadius: 4, fontSize: '.92rem', cursor: 'pointer',
                   transition: 'all .12s', fontFamily: 'inherit',
                   display: 'flex', alignItems: 'flex-start', gap: '.75rem',
                 }}
               >
                 <span style={{
-                  minWidth: 26, height: 26, borderRadius: '50%',
-                  background: selected ? '#2c6e49' : '#f1f5f9',
-                  color: selected ? '#fff' : '#64748b',
+                  minWidth: 26, height: 26, borderRadius: 4,
+                  background: selected ? '#131311' : '#f3eedf',
+                  color: selected ? '#d99916' : '#80796a',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: '.78rem', fontWeight: 700, flexShrink: 0, marginTop: '.05rem',
+                  fontSize: '.78rem', fontWeight: 800, flexShrink: 0, marginTop: '.05rem',
+                  fontFamily: "'Fraunces', Georgia, serif",
                 }}>
                   {String.fromCharCode(65 + i)}
                 </span>
@@ -886,11 +888,12 @@ function PretestScreen({ questions, answers, onAnswer, onSubmit, onBack }) {
             key={i}
             onClick={() => setCurrentIdx(i)}
             style={{
-              width: 28, height: 28, borderRadius: 6,
-              background: i === currentIdx ? '#2c6e49' : answers[i] !== undefined ? '#d1fae5' : '#f1f5f9',
-              color: i === currentIdx ? '#fff' : answers[i] !== undefined ? '#166534' : '#94a3b8',
-              border: `1.5px solid ${i === currentIdx ? '#2c6e49' : answers[i] !== undefined ? '#86efac' : '#e2e8f0'}`,
-              fontSize: '.72rem', fontWeight: 700, cursor: 'pointer',
+              width: 28, height: 28, borderRadius: 4,
+              background: i === currentIdx ? '#131311' : answers[i] !== undefined ? '#fbecc4' : '#f3eedf',
+              color: i === currentIdx ? '#d99916' : answers[i] !== undefined ? '#131311' : '#80796a',
+              border: `1.5px solid ${i === currentIdx ? '#131311' : answers[i] !== undefined ? '#e2c578' : '#e0d8bf'}`,
+              fontSize: '.72rem', fontWeight: 800, cursor: 'pointer',
+              fontFamily: "'Fraunces', Georgia, serif",
             }}
           >
             {i + 1}
@@ -931,9 +934,9 @@ function PretestResultsScreen({ domainScores, weakDomains, onStudy, onSkip }) {
       <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem' }}>Here's how you did across all 6 domains</p>
 
       <div className="card" style={{ padding: '1.75rem', marginBottom: '1.25rem', textAlign: 'center' }}>
-        <div style={{ fontSize: '3rem', fontWeight: 900, color: overall >= 70 ? '#16a34a' : '#dc2626' }}>{overall}%</div>
+        <div style={{ fontFamily: "'Fraunces', Georgia, serif", fontSize: '3rem', fontWeight: 900, color: overall >= 70 ? '#1f4d2e' : '#b14d2b', letterSpacing: '-0.03em' }}>{overall}%</div>
         <p style={{ color: 'var(--text-muted)', fontSize: '.9rem' }}>{totalC} / {totalQ} correct</p>
-        <p style={{ marginTop: '.5rem', fontWeight: 600, color: overall >= 70 ? '#16a34a' : '#dc2626' }}>
+        <p style={{ marginTop: '.5rem', fontWeight: 700, color: overall >= 70 ? '#1f4d2e' : '#b14d2b' }}>
           {overall >= 70 ? '✓ Strong baseline — ready to proceed!' : '⚠ Some domains need review before your exam'}
         </p>
       </div>
@@ -949,7 +952,7 @@ function PretestResultsScreen({ domainScores, weakDomains, onStudy, onSkip }) {
                   <span style={{ fontSize: '.82rem', color: 'var(--text-muted)' }}>{d.correct}/{d.total}</span>
                   <span style={{
                     fontSize: '.82rem', fontWeight: 700,
-                    color: d.pct === null ? '#94a3b8' : d.pct >= 70 ? '#16a34a' : '#dc2626',
+                    color: d.pct === null ? '#80796a' : d.pct >= 70 ? '#1f4d2e' : '#b14d2b',
                   }}>{d.pct === null ? 'N/A' : `${d.pct}%`}</span>
                   {weakDomains.includes(d.name)
                     ? <span className="badge badge-danger">Weak</span>
@@ -960,7 +963,7 @@ function PretestResultsScreen({ domainScores, weakDomains, onStudy, onSkip }) {
                 <div className="progress-bar">
                   <div className="progress-fill" style={{
                     width: `${d.pct}%`,
-                    background: d.pct >= 70 ? '#16a34a' : '#dc2626',
+                    background: d.pct >= 70 ? '#1f4d2e' : '#b14d2b',
                   }} />
                 </div>
               )}
@@ -1491,18 +1494,19 @@ function ExamScreen({ questions, answers, flagged, timeLeft, onAnswer, onFlag, o
             return (
               <button key={i} onClick={() => onAnswer(currentIdx, i)} style={{
                 textAlign: 'left', padding: '.85rem 1.1rem',
-                border: `2px solid ${selected ? '#2c6e49' : '#e2e8f0'}`,
-                background: selected ? '#d1fae5' : '#fff',
-                borderRadius: 8, fontSize: '.92rem', cursor: 'pointer',
+                border: `2px solid ${selected ? '#131311' : '#e0d8bf'}`,
+                background: selected ? '#fbecc4' : '#fff',
+                borderRadius: 4, fontSize: '.92rem', cursor: 'pointer',
                 fontFamily: 'inherit', display: 'flex', alignItems: 'flex-start', gap: '.75rem',
                 transition: 'all .12s',
               }}>
                 <span style={{
-                  minWidth: 26, height: 26, borderRadius: '50%',
-                  background: selected ? '#2c6e49' : '#f1f5f9',
-                  color: selected ? '#fff' : '#64748b',
+                  minWidth: 26, height: 26, borderRadius: 4,
+                  background: selected ? '#131311' : '#f3eedf',
+                  color: selected ? '#d99916' : '#80796a',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: '.78rem', fontWeight: 700, flexShrink: 0, marginTop: '.05rem',
+                  fontSize: '.78rem', fontWeight: 800, flexShrink: 0, marginTop: '.05rem',
+                  fontFamily: "'Fraunces', Georgia, serif",
                 }}>{String.fromCharCode(65 + i)}</span>
                 <span>{opt}</span>
               </button>
