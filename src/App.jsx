@@ -660,6 +660,8 @@ function WelcomeScreen({
         </div>
       </section>
 
+      <div className="citrine-inner">
+
       {/* TODAY'S FOCUS */}
       <div className="section-head"><h2>Today's <i>focus</i></h2><span className="meta">— Smart suggestion</span></div>
       <div className="focus-card fade-up fade-up-2" onClick={focus.go}>
@@ -815,6 +817,8 @@ function WelcomeScreen({
           </p>
         </div>
       )}
+
+      </div>{/* /citrine-inner */}
     </div>
   )
 }
