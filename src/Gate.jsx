@@ -27,7 +27,7 @@ import { useEffect, useRef, useState } from 'react'
 const ACCESS_SALT = 'onelove-rbt'
 const ACCESS_HASH = '9b02115ed1838edc351ecfb27812c3e56cac1aba8c1bd6f3f96c71d225f175c2' // sha256("onelove-rbt:onelove2026")
 const APP_NAME = 'RBT'
-const LOG_ENDPOINT = 'PASTE_YOUR_APPS_SCRIPT_URL_HERE'
+const LOG_ENDPOINT = 'https://script.google.com/macros/s/AKfycbzPJa2EKhCGep6WRsbqWjq_eHBx-wQ58p92KkkiayzvHjFkCekaHRFlyk0FVvECd-ckjg/exec'
 
 async function sha256Hex(s) {
   const bytes = new TextEncoder().encode(s)
