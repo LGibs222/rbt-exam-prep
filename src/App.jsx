@@ -10,7 +10,17 @@ const STORAGE_KEY = 'rbt-exam-prep-v1'
 const loadPersisted = () => {
   try {
     const r = localStorage.getItem(STORAGE_KEY)
-    return r ? JSON.parse(r) : null
+    if (!r) return null
+    const p = JSON.parse(r)
+    if (!p || typeof p !== 'object') return null
+    // Defensive shape coercion so corrupt/older localStorage can't crash the app on resume.
+    if (!Array.isArray(p.pretestQuestions)) p.pretestQuestions = []
+    if (!Array.isArray(p.examQuestions)) p.examQuestions = []
+    if (!p.pretestAnswers || typeof p.pretestAnswers !== 'object') p.pretestAnswers = {}
+    if (!p.examAnswers || typeof p.examAnswers !== 'object') p.examAnswers = {}
+    if (!p.moduleStatus || typeof p.moduleStatus !== 'object') p.moduleStatus = {}
+    if (!Array.isArray(p.weakDomains)) p.weakDomains = []
+    return p
   } catch { return null }
 }
 const savePersisted = d => { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(d)) } catch {} }
@@ -363,7 +373,7 @@ function scoreDomains(questions, answers) {
   DOMAIN_NAMES.forEach(d => { totals[d] = 0; corrects[d] = 0 })
   questions.forEach((q, i) => {
     const dn = q.domain_name
-    if (!totals[dn] === undefined) return
+    if (totals[dn] === undefined) return
     totals[dn] = (totals[dn] || 0) + 1
     if (answers[i] === q.correct) corrects[dn] = (corrects[dn] || 0) + 1
   })
@@ -2430,7 +2440,18 @@ export default function App() {
   }, [])
 
   const handleNav = useCallback((phase) => {
-    setState(s => ({ ...s, phase }))
+    setState(s => {
+      const next = { ...s, phase }
+      // Initialize pretest questions if entering pretest cold (avoids submit-with-empty-array bug)
+      if (phase === 'pretest' && (!s.pretestQuestions || s.pretestQuestions.length === 0)) {
+        next.pretestQuestions = shuffleQuestions(PRETEST_QUESTIONS)
+      }
+      // Build the exam ahead of exam_intro so the user can never land on a blank fullexam screen
+      if (phase === 'exam_intro' && (!s.examQuestions || s.examQuestions.length === 0)) {
+        next.examQuestions = buildExam()
+      }
+      return next
+    })
   }, [])
 
   // PRETEST handlers
