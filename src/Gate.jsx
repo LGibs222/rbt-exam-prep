@@ -15,38 +15,16 @@ import { useEffect, useRef, useState } from 'react'
  *   3. Paste the resulting 64-char hex string into ACCESS_HASH below.
  *   4. Commit + push.
  *
- * Users who were already let in stay let in until they hit "Sign out" or
- * the GATE_VERSION below is bumped (which invalidates everyone).
+ * Access code is required on every page load — no "remember me", no
+ * persisted session. Refreshing the tab returns the user to this gate.
  */
 const ACCESS_SALT = 'onelove-rbt'
 const ACCESS_HASH = '9b02115ed1838edc351ecfb27812c3e56cac1aba8c1bd6f3f96c71d225f175c2' // sha256("onelove-rbt:onelove2026")
-const GATE_VERSION = 'v1'                              // bump to invalidate every saved session
-const STORAGE_KEY = 'ol-rbt-gate'
 
 async function sha256Hex(s) {
   const bytes = new TextEncoder().encode(s)
   const buf = await crypto.subtle.digest('SHA-256', bytes)
   return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('')
-}
-
-function readSession() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return null
-    const j = JSON.parse(raw)
-    if (j?.v !== GATE_VERSION) return null
-    if (j?.exp && Date.now() > j.exp) return null
-    return j
-  } catch { return null }
-}
-
-function writeSession(rememberDays) {
-  const exp = rememberDays ? Date.now() + rememberDays * 86400000 : null
-  localStorage.setItem(STORAGE_KEY, JSON.stringify({ v: GATE_VERSION, exp }))
-}
-
-export function clearGate() {
-  try { localStorage.removeItem(STORAGE_KEY) } catch {}
 }
 
 function OneLoveGateLogo() {
@@ -62,9 +40,8 @@ function OneLoveGateLogo() {
 }
 
 export default function Gate({ children }) {
-  const [authed, setAuthed] = useState(() => !!readSession())
+  const [authed, setAuthed] = useState(false)
   const [pw, setPw] = useState('')
-  const [remember, setRemember] = useState(true)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const inputRef = useRef(null)
@@ -78,7 +55,6 @@ export default function Gate({ children }) {
     try {
       const candidate = await sha256Hex(`${ACCESS_SALT}:${pw}`)
       if (candidate === ACCESS_HASH) {
-        writeSession(remember ? 30 : 0)
         setAuthed(true)
       } else {
         setError('That access code didn’t match. Check with your provider.')
@@ -129,13 +105,9 @@ export default function Gate({ children }) {
             }}
           />
           {error && <div style={{ marginTop: 8, fontSize: 12.5, color: '#e8a597' }}>{error}</div>}
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 14, fontSize: 13, color: 'rgba(251,247,234,0.7)', cursor: 'pointer' }}>
-            <input type="checkbox" checked={remember} onChange={e => setRemember(e.target.checked)} disabled={busy}/>
-            Remember me on this device for 30 days
-          </label>
           <button type="submit" disabled={busy || !pw}
             style={{
-              width: '100%', marginTop: 18, padding: '13px', borderRadius: 10, border: 'none',
+              width: '100%', marginTop: 16, padding: '13px', borderRadius: 10, border: 'none',
               background: busy || !pw ? 'rgba(217,153,22,0.4)' : '#d99916', color: '#131311',
               fontSize: 14.5, fontWeight: 700, letterSpacing: '0.02em', cursor: busy || !pw ? 'default' : 'pointer',
               fontFamily: 'inherit',
