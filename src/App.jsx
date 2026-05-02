@@ -456,6 +456,52 @@ function StatsCard({ stats }) {
 }
 
 // ─── NavBar ───────────────────────────────────────────────────────────────────
+// ─── One Love brand mark (compact wordmark for nav bar) ──────────────────────
+// Cream-on-ink "Variation C" treatment — Fraunces serif "One [♥] Love" with
+// italic Love. No rules or tagline at this size; the full lockup with rules
+// and "LICENSED BEHAVIOR ANALYSTS PLLC" tagline lives in the footer.
+function OneLoveLogo({ height = 28, dark = true }) {
+  const inkColor = dark ? '#fbf7ea' : '#161210'
+  const heartColor = dark ? '#c4493a' : '#a8302a'
+  return (
+    <svg height={height} viewBox="0 0 380 80" xmlns="http://www.w3.org/2000/svg" aria-label="One Love" style={{ display: 'block' }}>
+      <text x="170" y="60" textAnchor="end" fontFamily="Fraunces, Georgia, serif" fontWeight="900" fontSize="54" letterSpacing="-1.2" fill={inkColor}>One</text>
+      <g transform="translate(190, 35)">
+        <path d="M 10 4 C 10 -2, 4 -6, 0 -2 C -4 -6, -10 -2, -10 4 C -10 11, 0 17, 0 17 C 0 17, 10 11, 10 4 Z" fill={heartColor}/>
+      </g>
+      <text x="208" y="60" fontFamily="Fraunces, Georgia, serif" fontWeight="900" fontStyle="italic" fontSize="54" letterSpacing="-1.2" fill={inkColor}>Love</text>
+    </svg>
+  )
+}
+
+// ─── Disclaimer footer ───────────────────────────────────────────────────────
+function OneLoveFooter() {
+  return (
+    <footer style={{
+      maxWidth: 1180, margin: '0 auto', padding: '32px 24px 28px',
+      borderTop: '1px solid var(--line-soft, #e0d8bf)',
+      marginTop: 40,
+      fontFamily: 'Inter, system-ui, sans-serif',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 14, flexWrap: 'wrap' }}>
+        <OneLoveLogo height={26} dark={false}/>
+        <div style={{ fontSize: '.7rem', fontWeight: 700, letterSpacing: '.18em', textTransform: 'uppercase', color: 'var(--text-muted, #80796a)' }}>
+          Licensed Behavior Analysts PLLC
+        </div>
+      </div>
+      <p style={{ fontSize: '.78rem', lineHeight: 1.65, color: 'var(--text-muted, #80796a)', maxWidth: '70ch', margin: 0 }}>
+        <strong>Disclaimer.</strong> One Love (Love Over Licensed Behavior Analysts, PLLC) is not affiliated
+        with, endorsed by, or sponsored by the Behavior Analyst Certification Board (BACB®). BCBA® and RBT®
+        are registered trademarks of the BACB. This practice tool is provided for educational purposes only
+        and does not guarantee passage of the BACB examination.
+      </p>
+      <p style={{ fontSize: '.7rem', color: 'var(--text-muted, #80796a)', marginTop: 12, opacity: 0.75 }}>
+        © {new Date().getFullYear()} Love Over Licensed Behavior Analysts, PLLC. All rights reserved.
+      </p>
+    </footer>
+  )
+}
+
 function NavBar({ phase, pretestSubmitted, skippedPretest, moduleStatus, weakDomains, onNav, onReset, theme, onToggleTheme }) {
   const studyStarted = pretestSubmitted || skippedPretest
   const allPassed = weakDomains.length > 0 && weakDomains.every(d => moduleStatus[d] === 'passed')
@@ -476,10 +522,23 @@ function NavBar({ phase, pretestSubmitted, skippedPretest, moduleStatus, weakDom
       background: '#131311', borderBottom: '3px solid #d99916',
       boxShadow: '0 2px 8px rgba(19,19,17,.18)',
     }}>
+      {/* === Logo bar (One Love brand) === */}
       <div style={{
         maxWidth: 860, margin: '0 auto',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '.6rem 1rem',
+        padding: '8px 1rem 6px',
+        borderBottom: '1px solid rgba(251,247,234,0.08)',
+      }}>
+        <OneLoveLogo height={28}/>
+        <div style={{ fontFamily: 'Inter', fontSize: '.66rem', fontWeight: 600, letterSpacing: '.18em', textTransform: 'uppercase', color: 'rgba(251,247,234,.55)' }}>
+          RBT Exam Prep
+        </div>
+      </div>
+      {/* === Tab bar === */}
+      <div style={{
+        maxWidth: 860, margin: '0 auto',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '.45rem 1rem',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '.25rem', flexWrap: 'wrap' }}>
           {navItems.map(item => {
@@ -2761,6 +2820,8 @@ export default function App() {
           onReview={() => setState(s => ({ ...s, phase: 'exam_review' }))}
         />
       )}
+
+      <OneLoveFooter/>
     </>
   )
 }
