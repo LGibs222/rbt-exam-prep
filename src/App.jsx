@@ -5,6 +5,7 @@ import { QUESTION_BANK } from './data/questions.js'
 import { MODULE_ENHANCEMENTS } from './data/moduleEnhancements.js'
 import { SAFMEDS_DECKS } from './data/safmedsDecks.js'
 import { TTSButton } from './TTS.jsx'
+import { QuickCheck, CategorizeGame, AnimatedVisual, MasteryMap } from './Engagement.jsx'
 
 // ─── localStorage persistence ─────────────────────────────────────────────────
 const STORAGE_KEY = 'rbt-exam-prep-v1'
@@ -433,6 +434,8 @@ const INITIAL = {
   modulePhase: 'content', // 'content'|'quiz'
   moduleQuizAnswers: {},
   moduleQuizSubmitted: false,
+  // per-concept progress: { [domain]: { [conceptIdx]: { viewed, rating } } }
+  conceptProgress: {},
   // exam
   examQuestions: null, // array
   examAnswers: {},     // index → choice
@@ -1198,12 +1201,14 @@ function ModulesScreen({ weakDomains, moduleStatus, onSelectModule, onStartExam,
 // Clinical Pro redesign — clean professional, healthcare-grade chrome,
 // single clinical-blue accent, with per-domain colors retained as
 // secondary wayfinding accents (top border, dot indicators).
-function ModuleScreen({ domainName, modulePhase, quizAnswers, quizSubmitted, onAnswer, onSubmitQuiz, onRetryQuiz, onBackToModules, onStartQuiz, onReviewConcepts }) {
+function ModuleScreen({ domainName, modulePhase, quizAnswers, quizSubmitted, onAnswer, onSubmitQuiz, onRetryQuiz, onBackToModules, onStartQuiz, onReviewConcepts, conceptProgress, onConceptView, onConceptRate }) {
   const mod = MODULES[domainName]
   const [conceptIdx, setConceptIdx] = useState(0)
   const [quizIdx, setQuizIdx] = useState(0)
   const [flippedTerms, setFlippedTerms] = useState({})
+  const [showMap, setShowMap] = useState(false)
   const color = DOMAIN_COLORS[domainName]
+  useEffect(() => { if (modulePhase === 'content') onConceptView?.(conceptIdx) }, [modulePhase, conceptIdx])
 
   if (!mod) return <div className="page"><p>Module not found.</p></div>
 
@@ -1300,7 +1305,55 @@ function ModuleScreen({ domainName, modulePhase, quizAnswers, quizSubmitted, onA
                     <ConceptVisual type={concept.visual}/>
                   </div>
                 )}
+
+                {concept.animatedVisual && (
+                  <div className="visual-card" style={{ marginTop: '1.1rem', background: 'var(--clp-paper-2)', border: '1px solid var(--clp-line)', borderRadius: 4, padding: '1rem .5rem' }}>
+                    <AnimatedVisual kind={concept.animatedVisual} color={color}/>
+                  </div>
+                )}
+
+                {/* Quick Check (active recall prompt) */}
+                {concept.quickCheck && (
+                  <QuickCheck
+                    quickCheck={concept.quickCheck}
+                    color={color}
+                    onRate={(rating) => onConceptRate?.(conceptIdx, rating)}
+                  />
+                )}
+
+                {/* Tap-to-categorize sort game */}
+                {concept.categorize && (
+                  <CategorizeGame
+                    categorize={concept.categorize}
+                    color={color}
+                    onComplete={(r) => { if (r.correct === r.total) onConceptRate?.(conceptIdx, 'got-it') }}
+                  />
+                )}
               </div>
+            </div>
+
+            {/* MASTERY MAP (toggleable) */}
+            <div className="clp-card" style={{ marginTop: '1rem' }}>
+              <div style={{ padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+                  🗺️ Domain Progress
+                </div>
+                <button onClick={() => setShowMap(s => !s)}
+                  style={{ padding: '5px 11px', borderRadius: 99, border: `1px solid ${color}`, background: showMap ? color : 'transparent', color: showMap ? '#fff' : color, cursor: 'pointer', fontSize: 11, fontWeight: 700, fontFamily: 'inherit' }}>
+                  {showMap ? 'Hide map' : 'Show map'}
+                </button>
+              </div>
+              {showMap && (
+                <div style={{ padding: '0 16px 14px' }}>
+                  <MasteryMap
+                    domain={domainName}
+                    concepts={mod.concepts}
+                    progress={conceptProgress}
+                    onJumpTo={(i) => { setConceptIdx(i); setShowMap(false) }}
+                    color={color}
+                  />
+                </div>
+              )}
             </div>
 
             {/* KEY TERMS */}
@@ -3206,6 +3259,18 @@ export default function App() {
           onReviewConcepts={() => setState(s => ({ ...s, modulePhase: 'content', moduleQuizAnswers: {}, moduleQuizSubmitted: false }))}
           onBackToModules={handleBackToModules}
           onStartQuiz={handleModuleStartQuiz}
+          conceptProgress={state.conceptProgress?.[state.activeModule] || {}}
+          onConceptView={(idx) => setState(p => {
+            const dom = p.activeModule
+            const cur = p.conceptProgress?.[dom] || {}
+            if (cur[idx]?.viewed) return p
+            return { ...p, conceptProgress: { ...p.conceptProgress, [dom]: { ...cur, [idx]: { ...(cur[idx]||{}), viewed: true } } } }
+          })}
+          onConceptRate={(idx, rating) => setState(p => {
+            const dom = p.activeModule
+            const cur = p.conceptProgress?.[dom] || {}
+            return { ...p, conceptProgress: { ...p.conceptProgress, [dom]: { ...cur, [idx]: { ...(cur[idx]||{}), viewed: true, rating } } } }
+          })}
         />
       )}
 
