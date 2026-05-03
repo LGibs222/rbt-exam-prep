@@ -4,6 +4,7 @@ import { MODULES } from './data/modules.js'
 import { QUESTION_BANK } from './data/questions.js'
 import { MODULE_ENHANCEMENTS } from './data/moduleEnhancements.js'
 import { SAFMEDS_DECKS } from './data/safmedsDecks.js'
+import { TTSButton } from './TTS.jsx'
 
 // ─── localStorage persistence ─────────────────────────────────────────────────
 const STORAGE_KEY = 'rbt-exam-prep-v1'
@@ -1276,7 +1277,15 @@ function ModuleScreen({ domainName, modulePhase, quizAnswers, quizSubmitted, onA
                 </div>
               </div>
               <div className="clp-card-body">
-                <h2 className="clp-section-title">{concept.title}</h2>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:12,marginBottom:8}}>
+                  <h2 className="clp-section-title" style={{margin:0,flex:1}}>{concept.title}</h2>
+                  <TTSButton
+                    token={`mod:${mod.id || domain}:${conceptIdx}`}
+                    text={`${concept.title}. ${concept.body}${concept.example ? '. Example: ' + concept.example : ''}`}
+                    label="Read"
+                    size="xs"
+                  />
+                </div>
                 <p className="clp-text" style={{ whiteSpace: 'pre-wrap' }}>{concept.body}</p>
 
                 {concept.example && (
@@ -1391,7 +1400,10 @@ function ModuleScreen({ domainName, modulePhase, quizAnswers, quizSubmitted, onA
                   {!isCorrect && (
                     <div className="clp-review-row"><span className="green">✓ Correct:</span> {q.options[q.correct]}</div>
                   )}
-                  <div className="clp-rationale">💡 {q.rationale}</div>
+                  <div className="clp-rationale" style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:10}}>
+                    <span style={{flex:1}}>💡 {q.rationale}</span>
+                    <TTSButton token={`rat:quiz:${i}`} text={q.rationale} label="" size="xs"/>
+                  </div>
                 </div>
               )
             })}
@@ -2178,7 +2190,7 @@ function SafmedsSessionScreen({ deckId, mode, timer, cards, cardIdx, revealed, c
         <button onClick={onQuit} style={{ background: 'rgba(255,255,255,0.18)', border: 'none', color: '#fff', padding: '6px 12px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>End</button>
       </div>
 
-      <div style={{ minHeight: 280, background: 'var(--surface)', border: `2px solid ${revealed ? '#86efac' : '#a78bfa'}`, borderRadius: 18, padding: '30px 26px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', marginBottom: 18, boxShadow: '0 6px 24px rgba(91,33,182,0.12)' }}>
+      <div style={{ minHeight: 280, background: 'var(--surface)', border: `2px solid ${revealed ? '#86efac' : '#a78bfa'}`, borderRadius: 18, padding: '30px 26px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', marginBottom: 10, boxShadow: '0 6px 24px rgba(91,33,182,0.12)' }}>
         <div style={{ fontSize: 11, fontWeight: 800, color: revealed ? '#16a34a' : '#5b21b6', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 14 }}>
           {revealed ? '✓ Term' : 'Definition'}
         </div>
@@ -2190,6 +2202,15 @@ function SafmedsSessionScreen({ deckId, mode, timer, cards, cardIdx, revealed, c
             <p style={{ fontSize: 13, lineHeight: 1.55, color: 'var(--text-muted)', margin: 0, fontStyle: 'italic' }}>{card.def}</p>
           </div>
         )}
+      </div>
+
+      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 18 }}>
+        <TTSButton
+          token={`sfx:${cardIdx}:${revealed ? 'back' : 'front'}`}
+          text={revealed ? `${card.term}. ${card.def}` : card.def}
+          label="Read aloud"
+          size="sm"
+        />
       </div>
 
       {!revealed ? (
@@ -2331,7 +2352,10 @@ function WeakSpotReviewScreen({ queue, idx, answers, onAnswer, onNext, onQuit, s
             {isCorrect ? `✓ Right! ${(item.consecutiveCorrect || 0) + 1 >= 2 ? 'Graduated 🎓' : 'One more in a row to graduate'}` : '✗ Stays in queue — try again next time'}
           </div>
           <div className="card" style={{ padding: '1rem 1.25rem', marginBottom: '1rem', background: 'var(--surface-alt)' }}>
-            <div style={{ fontSize: 10, fontWeight: 800, color: '#1d4ed8', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 6 }}>📘 Rationale</div>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom: 6 }}>
+              <div style={{ fontSize: 10, fontWeight: 800, color: '#1d4ed8', textTransform: 'uppercase', letterSpacing: '0.07em' }}>📘 Rationale</div>
+              <TTSButton token={`rat:weak:${idx}`} text={q.rationale} label="" size="xs"/>
+            </div>
             <p style={{ fontSize: '.88rem', lineHeight: 1.7, margin: 0 }}>{q.rationale}</p>
           </div>
           <button className="btn btn-primary" onClick={onNext} style={{ width: '100%' }}>
@@ -2577,7 +2601,10 @@ function ExamReviewScreen({ examQuestions, examAnswers, onBack }) {
           </div>
 
           <div className="card" style={{ padding: '1.1rem 1.25rem', marginBottom: '1rem', background: 'var(--surface-alt)' }}>
-            <div style={{ fontSize: 10, fontWeight: 800, color: '#1d4ed8', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 6 }}>📘 Rationale</div>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom: 6 }}>
+              <div style={{ fontSize: 10, fontWeight: 800, color: '#1d4ed8', textTransform: 'uppercase', letterSpacing: '0.07em' }}>📘 Rationale</div>
+              <TTSButton token={`rat:exam:${q.id||q.stem?.slice(0,30)}`} text={q.rationale} label="" size="xs"/>
+            </div>
             <p style={{ fontSize: '.88rem', lineHeight: 1.7, margin: 0 }}>{q.rationale}</p>
           </div>
 
