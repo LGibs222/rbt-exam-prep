@@ -1280,7 +1280,7 @@ function ModuleScreen({ domainName, modulePhase, quizAnswers, quizSubmitted, onA
                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:12,marginBottom:8}}>
                   <h2 className="clp-section-title" style={{margin:0,flex:1}}>{concept.title}</h2>
                   <TTSButton
-                    token={`mod:${mod.id || domain}:${conceptIdx}`}
+                    token={`mod:${domainName}:${conceptIdx}`}
                     text={`${concept.title}. ${concept.body}${concept.example ? '. Example: ' + concept.example : ''}`}
                     label="Read"
                     size="xs"
