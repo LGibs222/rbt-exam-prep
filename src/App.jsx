@@ -1208,7 +1208,8 @@ function ModuleScreen({ domainName, modulePhase, quizAnswers, quizSubmitted, onA
   const [flippedTerms, setFlippedTerms] = useState({})
   const [showMap, setShowMap] = useState(false)
   const color = DOMAIN_COLORS[domainName]
-  useEffect(() => { if (modulePhase === 'content') onConceptView?.(conceptIdx) }, [modulePhase, conceptIdx])
+  // Include domainName so cross-domain switches at concept 0 still register.
+  useEffect(() => { if (modulePhase === 'content') onConceptView?.(conceptIdx) }, [modulePhase, conceptIdx, domainName])
 
   if (!mod) return <div className="page"><p>Module not found.</p></div>
 
