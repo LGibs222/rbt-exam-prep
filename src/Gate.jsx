@@ -27,7 +27,7 @@ import { useEffect, useRef, useState } from 'react'
 const ACCESS_SALT = 'onelove-rbt'
 const ACCESS_HASH = '9b02115ed1838edc351ecfb27812c3e56cac1aba8c1bd6f3f96c71d225f175c2' // sha256("onelove-rbt:onelove2026")
 const APP_NAME = 'RBT'
-const LOG_ENDPOINT = 'https://script.google.com/macros/s/AKfycbzPJa2EKhCGep6WRsbqWjq_eHBx-wQ58p92KkkiayzvHjFkCekaHRFlyk0FVvECd-ckjg/exec'
+const LOG_ENDPOINT = 'https://script.google.com/macros/s/AKfycby5bv49s8z-oA525hit-LnvfgHDam4hUrSmsN79huqC-rnxMFJpB7QbI0isnjdjxQ/exec'
 
 async function sha256Hex(s) {
   const bytes = new TextEncoder().encode(s)
@@ -37,12 +37,13 @@ async function sha256Hex(s) {
 
 // Fire-and-forget login log. Uses no-cors so a failing endpoint never
 // blocks the user, and does NOT await — the gate proceeds regardless.
-function logLogin(name) {
+function logLogin(name, code) {
   if (!LOG_ENDPOINT || LOG_ENDPOINT.startsWith('PASTE_')) return
   try {
     const payload = {
       app: APP_NAME,
       name: name.trim(),
+      code: code || '',
       timestamp: new Date().toISOString(),
       userAgent: navigator.userAgent || '',
       timezone: (Intl.DateTimeFormat().resolvedOptions().timeZone) || '',
@@ -54,6 +55,31 @@ function logLogin(name) {
       fetch(LOG_ENDPOINT, { method: 'POST', mode: 'no-cors', body: JSON.stringify(payload), keepalive: true }).catch(() => {})
     }
   } catch { /* never block login on a logging failure */ }
+}
+
+// JSONP call to the backend (Apps Script web apps aren't CORS-readable, but a
+// <script> tag is). Resolves to the parsed object, or null on error/timeout.
+function jsonp(url, timeoutMs = 8000) {
+  return new Promise((resolve) => {
+    const cb = '__olcb_' + Math.random().toString(36).slice(2)
+    let done = false
+    const s = document.createElement('script')
+    const cleanup = () => { try { delete window[cb] } catch {} if (s.parentNode) s.parentNode.removeChild(s); clearTimeout(timer) }
+    const finish = (v) => { if (done) return; done = true; cleanup(); resolve(v) }
+    const timer = setTimeout(() => finish(null), timeoutMs)
+    window[cb] = (data) => finish(data)
+    s.onerror = () => finish(null)
+    s.src = url + (url.indexOf('?') < 0 ? '?' : '&') + 'callback=' + cb
+    document.head.appendChild(s)
+  })
+}
+// Validate a code against the backend. Returns {valid, name} or null if the
+// backend isn't configured/reachable (caller then falls back to the master code).
+async function validateCode(code) {
+  if (!LOG_ENDPOINT || LOG_ENDPOINT.startsWith('PASTE_')) return null
+  const url = LOG_ENDPOINT + (LOG_ENDPOINT.indexOf('?') < 0 ? '?' : '&') +
+    'action=validate&app=' + encodeURIComponent(APP_NAME) + '&code=' + encodeURIComponent(code)
+  return jsonp(url)
 }
 
 function OneLoveGateLogo() {
@@ -78,15 +104,24 @@ export default function Gate({ children }) {
 
   useEffect(() => { if (!authed) nameRef.current?.focus() }, [authed])
 
+  function admit(displayName, code) {
+    const nm = (displayName || name).trim()
+    logLogin(nm, code)
+    try { localStorage.setItem('ol-user', nm) } catch {}
+    setAuthed(true)
+  }
   async function onSubmit(e) {
     e.preventDefault()
     if (!name.trim() || !pw || busy) return
     setBusy(true); setError('')
+    const code = pw.trim()
     try {
-      const candidate = await sha256Hex(`${ACCESS_SALT}:${pw}`)
+      const res = await validateCode(code)
+      if (res && res.valid) { admit(res.name || name, code); return }
+      if (res && res.valid === false) { setError('That access code isn’t recognized. Request one below.'); return }
+      const candidate = await sha256Hex(`${ACCESS_SALT}:${code}`)
       if (candidate === ACCESS_HASH) {
-        logLogin(name)
-        setAuthed(true)
+        admit(name, code)
       } else {
         setError('That access code didn’t match. Check with your provider.')
       }
@@ -155,8 +190,12 @@ export default function Gate({ children }) {
             {busy ? 'Verifying…' : 'Enter'}
           </button>
         </form>
-        <p style={{ fontSize: 11, color: 'rgba(251,247,234,0.5)', margin: '22px 0 0', textAlign: 'center', lineHeight: 1.5 }}>
-          Need a code? Email <a href="mailto:lenwoodjr@gmail.com" style={{ color: '#d99916', fontWeight: 600 }}>lenwoodjr@gmail.com</a>
+        <a href="https://lgibs222.github.io/onelove-exam-prep/#request" target="_blank" rel="noopener"
+          style={{ display: 'block', width: '100%', boxSizing: 'border-box', marginTop: 16, padding: '12px', borderRadius: 10, border: '1.5px solid rgba(217,153,22,0.5)', background: 'transparent', color: '#d99916', fontSize: 13.5, fontWeight: 700, textAlign: 'center', textDecoration: 'none' }}>
+          Don’t have a code? Request access →
+        </a>
+        <p style={{ fontSize: 11, color: 'rgba(251,247,234,0.5)', margin: '12px 0 0', textAlign: 'center', lineHeight: 1.5 }}>
+          Or email <a href="mailto:lenwoodjr@gmail.com" style={{ color: '#d99916', fontWeight: 600 }}>lenwoodjr@gmail.com</a>
         </p>
       </div>
     </div>
