@@ -6,6 +6,8 @@ import { MODULE_ENHANCEMENTS } from './data/moduleEnhancements.js'
 import { SAFMEDS_DECKS } from './data/safmedsDecks.js'
 import { TTSButton } from './TTS.jsx'
 import { QuickCheck, CategorizeGame, AnimatedVisual, MasteryMap } from './Engagement.jsx'
+import { track } from './tracking.js'
+import MyProgressScreen from './MyProgress.jsx'
 
 // ─── localStorage persistence ─────────────────────────────────────────────────
 const STORAGE_KEY = 'rbt-exam-prep-v1'
@@ -552,6 +554,7 @@ function NavBar({ phase, pretestSubmitted, skippedPretest, moduleStatus, weakDom
     { id: 'pretest_results', label: 'Results', icon: '📊', unlock: pretestSubmitted },
     { id: 'modules', label: 'Study', icon: '📚', unlock: studyStarted && weakDomains.length > 0 },
     { id: 'safmeds', label: 'SAFMEDS', icon: '🎴', always: true },
+    { id: 'progress', label: 'My Progress', icon: '🧭', always: true },
     { id: 'exam_intro', label: 'Exam', icon: '🏁', unlock: examUnlocked },
   ]
 
@@ -2771,6 +2774,7 @@ function FinalResultsScreen({ examQuestions, examAnswers, examDomainScores, pret
 }
 
 // ─── App ──────────────────────────────────────────────────────────────────────
+const ovPctArr = arr => { if (!arr || !arr.length) return null; let c = 0, t = 0; arr.forEach(d => { c += (d.correct || 0); t += (d.total || 0) }); return t ? Math.round(c / t * 100) : null }
 export default function App() {
   const [state, setState] = useState(() => {
     const p = loadPersisted()
@@ -2780,6 +2784,15 @@ export default function App() {
   useEffect(() => {
     savePersisted(state)
   }, [state])
+
+  const teleRef = useRef(null)
+  if (teleRef.current === null) teleRef.current = { pre: !!state.pretestDomainScores, exam: !!state.examDomainScores, mods: new Set(Object.entries(state.moduleStatus || {}).filter(([, x]) => x === 'passed').map(([d]) => d)) }
+  useEffect(() => {
+    const r = teleRef.current
+    if (!r.pre && state.pretestDomainScores) { r.pre = true; track('pretest_completed', { overallPct: ovPctArr(state.pretestDomainScores), weak: state.weakDomains || [] }) }
+    if (!r.exam && state.examDomainScores) { r.exam = true; const a = ovPctArr(state.pretestDomainScores), b = ovPctArr(state.examDomainScores); track('posttest_completed', { overallPct: b, prePct: a, growth: (a != null && b != null) ? b - a : null }) }
+    Object.entries(state.moduleStatus || {}).forEach(([d, x]) => { if (x === 'passed' && !r.mods.has(d)) { r.mods.add(d); track('module_completed', { domain: d }) } })
+  }, [state.pretestDomainScores, state.examDomainScores, state.moduleStatus])
 
   // Reflect theme on <html> so CSS vars switch
   useEffect(() => {
@@ -3051,6 +3064,13 @@ export default function App() {
         onToggleTheme={() => setState(s => ({ ...s, theme: s.theme === 'dark' ? 'light' : 'dark' }))}
       />
 
+      {phase === 'progress' && (() => {
+        const best = state.examDomainScores || state.pretestDomainScores
+        const dsc = (best || []).map(d => ({ name: d.name, pct: d.pct }))
+        const a = ovPctArr(state.pretestDomainScores), b = ovPctArr(state.examDomainScores)
+        const hist = (state.safmeds && state.safmeds.history) || []
+        return <MyProgressScreen name={(()=>{try{return localStorage.getItem('ol-user')||''}catch{return ''}})()} accent="#d99916" theme={state.theme} overall={b!=null?b:a} pre={a} post={b} growth={(a!=null&&b!=null)?b-a:null} domains={dsc} modulesPassed={Object.values(state.moduleStatus||{}).filter(x=>x==='passed').length} modulesTotal={DOMAIN_NAMES.length} safmeds={{tokens:(state.safmeds&&state.safmeds.totalTokens)||0, sessions:hist.length, bestRate:hist.reduce((m,h)=>Math.max(m,h.rate||0),0)}} examTaken={!!state.examDomainScores} onHome={()=>handleNav('welcome')}/>
+      })()}
       {phase === 'welcome' && (
         <WelcomeScreen
           stats={state.stats}
