@@ -8,6 +8,7 @@ import { TTSButton } from './TTS.jsx'
 import { QuickCheck, CategorizeGame, AnimatedVisual, MasteryMap } from './Engagement.jsx'
 import { track } from './tracking.js'
 import MyProgressScreen from './MyProgress.jsx'
+import { scoreExam, tallyByDomain } from './scoring.js'
 
 // ─── localStorage persistence ─────────────────────────────────────────────────
 const STORAGE_KEY = 'rbt-exam-prep-v1'
@@ -351,6 +352,10 @@ const EXAM_DOMAIN_COUNTS = { A: 13, B: 8, C: 19, D: 14, E: 10, F: 11 }  // 75 sc
 const RBT_PILOT_QUESTIONS = 10
 const RBT_TOTAL_QUESTIONS = 85  // 75 scored + 10 pilot
 const RBT_SCORED_QUESTIONS = 75
+// Mock-exam scoring form. INTERNAL approximation — the BACB does not publish an
+// RBT scale or cut score, so we reuse the 0–500 / cut-400 convention for
+// consistency with the BCBA app. rawCut = summed modified-Angoff cut; tunable.
+const RBT_FORM = { rawCut: 60, scoredCount: 75, scaleMin: 0, scaleMax: 500, scaleCut: 400 } // 0.80 × 75
 const EXAM_DURATION = 90 * 60 // 90 min seat time per BACB
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
@@ -388,30 +393,25 @@ function buildExam() {
     const pool = QUESTION_BANK.filter(q => q.domain === letter && !used.has(q))
     const picked = shuffle(pool).slice(0, count)
     picked.forEach(q => used.add(q))
-    result.push(...picked)
+    result.push(...picked.map(q => ({ ...q, scored: true })))
   }
   // Add 10 pilot questions sampled randomly across all domains
   const remaining = QUESTION_BANK.filter(q => !used.has(q))
   const pilots = shuffle(remaining).slice(0, RBT_PILOT_QUESTIONS)
-  result.push(...pilots)
+  // Pilot/unscored fillers — tagged so the scoring engine ignores them.
+  result.push(...pilots.map(q => ({ ...q, scored: false })))
   return shuffle(result).map(shuffleQuestion)
 }
 
+// Per-domain breakdown for the results screen, via the shared scoring engine.
+// Scored items only — pilots (scored:false) are excluded, so domain totals sum
+// to the 75 scored items, not 85.
 function scoreDomains(questions, answers) {
-  const totals = {}, corrects = {}
-  DOMAIN_NAMES.forEach(d => { totals[d] = 0; corrects[d] = 0 })
-  questions.forEach((q, i) => {
-    const dn = q.domain_name
-    if (totals[dn] === undefined) return
-    totals[dn] = (totals[dn] || 0) + 1
-    if (answers[i] === q.correct) corrects[dn] = (corrects[dn] || 0) + 1
+  const by = tallyByDomain(questions, answers, q => q.domain_name, true)
+  return DOMAIN_NAMES.map(dn => {
+    const b = by[dn] || { correct: 0, total: 0 }
+    return { name: dn, total: b.total, correct: b.correct, pct: b.total ? Math.round((b.correct / b.total) * 100) : null }
   })
-  return DOMAIN_NAMES.map(dn => ({
-    name: dn,
-    total: totals[dn] || 0,
-    correct: corrects[dn] || 0,
-    pct: totals[dn] ? Math.round(((corrects[dn] || 0) / totals[dn]) * 100) : null,
-  }))
 }
 
 function fmtTime(sec) {
@@ -446,7 +446,7 @@ const INITIAL = {
   examStartTime: null,
   examTimeLeft: EXAM_DURATION,
   examSubmitted: false,
-  examDomainScores: null,
+  examDomainScores: null, examResult: null,
   // domain spot-check
   domainQuizDomain: null, domainQuizQuestions: [], domainQuizAnswers: {}, domainQuizCurrentIdx: 0,
   // weak spots
@@ -1571,9 +1571,9 @@ function ExamIntroScreen({ onBegin }) {
       <div className="card" style={{ padding: '1.75rem', marginBottom: '2rem', textAlign: 'left', maxWidth: 480, margin: '0 auto 2rem' }}>
         <div style={{ display: 'grid', gap: '.75rem' }}>
           {[
-            { icon: '❓', label: '85 Questions', sub: '75 scored + 10 pilot · official 3rd Ed proportions' },
+            { icon: '❓', label: '85 Questions', sub: '75 scored + 10 unscored pilot · official 3rd Ed proportions' },
             { icon: '⏱', label: '90 Minutes', sub: 'Countdown timer shown throughout' },
-            { icon: '🎯', label: '~70% to Pass', sub: '~60 of 85 correct (BACB sets exact scaled cutoff)' },
+            { icon: '🎯', label: 'Pass mark 400 / 500', sub: 'Scaled score · internal estimate (BACB does not publish the RBT scale)' },
             { icon: '🚩', label: 'Flag for Review', sub: 'Mark questions to revisit' },
           ].map(({ icon, label, sub }) => (
             <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '.6rem .75rem', background: 'var(--surface-alt)', borderRadius: 8 }}>
@@ -2696,26 +2696,31 @@ function ExamReviewScreen({ examQuestions, examAnswers, onBack }) {
 }
 
 // ─── FinalResultsScreen ───────────────────────────────────────────────────────
-function FinalResultsScreen({ examQuestions, examAnswers, examDomainScores, pretestDomainScores, onRetakeExam, onReset, onReview }) {
-  const total = examQuestions.length
-  const correct = examQuestions.filter((q, i) => examAnswers[i] === q.correct).length
-  const pct = Math.round((correct / total) * 100)
-  const passed = pct >= 70
+function FinalResultsScreen({ examQuestions, examAnswers, examResult, examDomainScores, pretestDomainScores, onRetakeExam, onReset, onReview }) {
+  // Pass/fail is driven by the SCALED score against the fixed pass mark — never
+  // by percent correct. examResult is computed at submit; recompute as a fallback
+  // for legacy saved attempts that predate scaled scoring.
+  const result = examResult || scoreExam(examQuestions || [], examAnswers || {}, RBT_FORM)
+  const { scaledScore, passed, rawScore, scoredCount, percentCorrect } = result
 
   return (
     <div className="page">
       <h2 style={{ fontSize: '1.5rem', fontWeight: 800, marginBottom: '.5rem' }}>Final Results</h2>
-      <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem' }}>Full Practice Exam · 85 Questions (75 scored + 10 pilot)</p>
+      <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem' }}>Full Practice Exam · 85 Questions (75 scored + 10 unscored pilot)</p>
 
       <div className="card" style={{
         padding: '2rem', marginBottom: '1.5rem', textAlign: 'center',
         borderTop: `6px solid ${passed ? '#16a34a' : '#dc2626'}`,
       }}>
-        <div style={{ fontSize: '4rem', fontWeight: 900, color: passed ? '#16a34a' : '#dc2626' }}>{pct}%</div>
+        <div style={{ fontSize: '3.5rem', fontWeight: 900, color: passed ? '#16a34a' : '#dc2626' }}>{scaledScore}<span style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-muted)' }}> / {RBT_FORM.scaleMax}</span></div>
         <p style={{ fontSize: '1.1rem', fontWeight: 700, color: passed ? '#16a34a' : '#dc2626', marginTop: '.3rem' }}>
           {passed ? '✓ PASSED' : '✗ NOT PASSED'}
         </p>
-        <p style={{ color: 'var(--text-muted)', marginTop: '.3rem' }}>{correct} / {total} correct · Need ~70% to pass</p>
+        <p style={{ color: 'var(--text-muted)', marginTop: '.3rem', fontSize: '.85rem' }}>{passed ? `At or above the ${RBT_FORM.scaleCut} pass mark` : `Below the ${RBT_FORM.scaleCut} pass mark`}</p>
+        <p style={{ color: 'var(--text-muted)', marginTop: '.45rem', fontSize: '.82rem' }}>Diagnostic: {rawScore}/{scoredCount} scored items correct ({percentCorrect}%)</p>
+        <p style={{ color: 'var(--text-muted)', opacity: .72, marginTop: '.5rem', fontSize: '.72rem', lineHeight: 1.5, maxWidth: 460, marginLeft: 'auto', marginRight: 'auto' }}>
+          Scaled scoring approximates BACB methodology (Angoff cut, raw→scaled conversion, equating). This RBT scale is an internal approximation — the BACB does not publish an RBT scale or cut score, so this is a practice estimate, not a prediction of your real exam result.
+        </p>
       </div>
 
       <div className="card" style={{ padding: '1.75rem', marginBottom: '1.5rem' }}>
@@ -2790,7 +2795,7 @@ export default function App() {
   useEffect(() => {
     const r = teleRef.current
     if (!r.pre && state.pretestDomainScores) { r.pre = true; track('pretest_completed', { overallPct: ovPctArr(state.pretestDomainScores), weak: state.weakDomains || [] }) }
-    if (!r.exam && state.examDomainScores) { r.exam = true; const a = ovPctArr(state.pretestDomainScores), b = ovPctArr(state.examDomainScores); track('posttest_completed', { overallPct: b, prePct: a, growth: (a != null && b != null) ? b - a : null }) }
+    if (!r.exam && state.examDomainScores) { r.exam = true; const a = ovPctArr(state.pretestDomainScores), b = ovPctArr(state.examDomainScores); const er = state.examResult || {}; track('posttest_completed', { overallPct: b, prePct: a, growth: (a != null && b != null) ? b - a : null, scaledScore: er.scaledScore ?? null, passed: er.passed ?? null }) }
     Object.entries(state.moduleStatus || {}).forEach(([d, x]) => { if (x === 'passed' && !r.mods.has(d)) { r.mods.add(d); track('module_completed', { domain: d }) } })
   }, [state.pretestDomainScores, state.examDomainScores, state.moduleStatus])
 
@@ -2883,6 +2888,7 @@ export default function App() {
               examTimeLeft: 0,
               examSubmitted: true,
               examDomainScores: scoreDomains(s.examQuestions, s.examAnswers),
+              examResult: scoreExam(s.examQuestions, s.examAnswers, RBT_FORM),
               phase: 'final_results',
               weakSpots: updateWeakSpots(s.weakSpots, s.examQuestions, s.examAnswers),
               stats: bumpStat(s.stats, 'examAttempts'),
@@ -2995,7 +3001,7 @@ export default function App() {
       examCurrentIdx: 0,
       examTimeLeft: EXAM_DURATION,
       examSubmitted: false,
-      examDomainScores: null,
+      examDomainScores: null, examResult: null,
       phase: 'exam_intro',
     }))
   }, [])
@@ -3023,10 +3029,12 @@ export default function App() {
     clearInterval(timerRef.current)
     setState(s => {
       const scores = scoreDomains(s.examQuestions, s.examAnswers)
+      const examResult = scoreExam(s.examQuestions, s.examAnswers, RBT_FORM)
       return {
         ...s,
         examSubmitted: true,
         examDomainScores: scores,
+        examResult,
         phase: 'final_results',
         weakSpots: updateWeakSpots(s.weakSpots, s.examQuestions, s.examAnswers),
         stats: bumpStat(s.stats, 'examAttempts'),
@@ -3043,7 +3051,7 @@ export default function App() {
       examCurrentIdx: 0,
       examTimeLeft: EXAM_DURATION,
       examSubmitted: false,
-      examDomainScores: null,
+      examDomainScores: null, examResult: null,
       phase: 'exam_intro',
     }))
   }, [])
@@ -3323,6 +3331,7 @@ export default function App() {
         <FinalResultsScreen
           examQuestions={state.examQuestions}
           examAnswers={state.examAnswers}
+          examResult={state.examResult}
           examDomainScores={state.examDomainScores}
           pretestDomainScores={state.pretestDomainScores}
           onRetakeExam={handleRetakeExam}
